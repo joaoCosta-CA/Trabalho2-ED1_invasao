@@ -1,8 +1,6 @@
 #ifndef LISTA_H
 #define LISTA_H
 
-#include <stdbool.h>
-
 /* * Definição de tipos opacos. 
  * O usuário só vê ponteiros void, sem saber o que há dentro.
  */
