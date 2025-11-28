@@ -29,7 +29,7 @@ void ler_arquivo_geo(const char *diretorio_base, const char *nome_arquivo, Lista
     FILE *arquivo = fopen(caminho_completo, "r");
     if (!arquivo) {
         perror("Erro ao abrir arquivo .geo");
-        return;
+        exit(EXIT_FAILURE);
     }
 
     char linha[1024];

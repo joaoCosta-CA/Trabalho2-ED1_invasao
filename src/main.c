@@ -2,12 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "lib/argumentos/argumentos.h"
-#include "lib/leitores/leitor_arq/leitor.h"
-#include "lib/leitores/arquivo_geo/leitor_geo.h"
-#include "lib/estruturas_dados/lista/lista.h"
-#include "lib/formas/enumFormas/formas.h"
-#include "lib/svg/svg.h"
+#include "argumentos.h"
+#include "leitor.h"
+#include "leitor_geo.h"
+#include "lista.h"
+#include "forma.h"
+#include "svg.h"
 
 #define MAX_FULL_PATH 1024
 
@@ -28,9 +28,14 @@ int main(int argc, char *argv[]) {
     const char *base_input_path = get_option_value(argc, argv, "e"); 
     const char *geo_filename = get_option_value(argc, argv, "f");
     const char *output_path = get_option_value(argc, argv, "o");
+    const char *arg_to = get_option_value(argc, argv, "-to");
+    const char *arg_i = get_option_value(argc, argv, "-i");
     
+    /*Tipo de Ordenação e Cutoff*/
+    char tipo_ordenacao = 'q'; 
+    int insertion_cutoff = 10;
 
-    /* 3. Verificações de Segurança */
+    /* 2. Verificações de Segurança */
     if (geo_filename == NULL || output_path == NULL) {
         printf("Erro: Os parâmetros -f e -o são obrigatórios.\n");
 
@@ -43,6 +48,16 @@ int main(int argc, char *argv[]) {
     if (!diretorio_valido(output_path)) {
         printf("Erro: O diretório de saída '%s' não existe ou não é válido.\n", output_path);
         exit(EXIT_FAILURE);
+    }
+
+
+    /*3. Verificação do Tipo de Ordenação */
+    if (arg_to != NULL) {
+        if (strcmp(arg_to, "m") == 0 || strcmp(arg_to, "q") == 0) {
+            tipo_ordenacao = arg_to[0];
+        } else {
+            fprintf(stderr, "Aviso: Tipo de ordenação '%s' desconhecido. Usando padrão 'q'.\n", arg_to);
+        }
     }
 
     /* 4. Inicialização das Estruturas */
