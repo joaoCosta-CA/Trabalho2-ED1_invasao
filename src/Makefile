@@ -1,37 +1,50 @@
+# ==========================================
+# MAKEFILE PRINCIPAL (src/Makefile)
+# ==========================================
+
 TARGET = ted
-
 CC = gcc
-
+# Flags base (Note que não listamos os -I aqui manualmente ainda)
 CFLAGS = -std=c99 -fstack-protector-all -Wall -Wextra -O0 -g -ggdb
 
-# Diretórios
+# Diretórios Raiz
 SRC_DIR = .
 LIB_DIR = ./lib
 
-# Bibliotecas matemáticas
+# Biblioteca Matemática
 LIBS = -lm
 
-SRCS = $(shell find $(SRC_DIR) -name "*.c")
+# ---------------------------------------------------------
+# INCLUDES
+# ---------------------------------------------------------
+# 1. Encontra TODAS as subpastas dentro de src e lib
+ALL_DIRS := $(shell find $(SRC_DIR) -type d)
+# 2. Adiciona o prefixo -I para cada diretório encontrado
+INC_FLAGS := $(addprefix -I,$(ALL_DIRS))
 
-# Cria a lista de objetos (.o) baseada nos nomes dos .c
-OBJS = $(SRCS:.c=.o)
+# ---------------------------------------------------------
+# FONTES E OBJETOS
+# ---------------------------------------------------------
+# Encontra todos os arquivos .c
+SRCS := $(shell find $(SRC_DIR) -name "*.c")
+OBJS := $(SRCS:.c=.o)
 
-INC_DIRS = $(shell find $(SRC_DIR) -type d)
-INC_FLAGS = $(addprefix -I,$(INC_DIRS))
+# ---------------------------------------------------------
+# REGRAS DE COMPILAÇÃO
+# ---------------------------------------------------------
 
-# Regra padrão
 all: $(TARGET)
 
-# Regra de compilação do executável
 $(TARGET): $(OBJS)
+	@echo "Linkando executável..."
 	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET) $(LIBS)
 
-# Regra de compilação dos arquivos de objeto
-# O $< é o arquivo .c e $@ é o arquivo .o
+# Regra para transformar .c em .o
 %.o: %.c
+	@echo "Compilando $<..."
+	# AQUI ESTÁ O TRUQUE: $(INC_FLAGS) diz ao GCC onde procurar os .h
 	$(CC) $(CFLAGS) $(INC_FLAGS) -c $< -o $@
 
-# Limpar arquivos
 clean:
 	rm -f $(OBJS) $(TARGET)
 

@@ -53,5 +53,4 @@ Item get(Lista l, Posic p);
  * ou NULL se os itens não devem ser liberados agora.
  */
 void killList(Lista l, void (*freeItem)(void*));
-
 #endif

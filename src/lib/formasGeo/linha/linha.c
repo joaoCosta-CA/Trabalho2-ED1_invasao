@@ -37,7 +37,7 @@ Linha criarLinha(int id, float x1, float y1, float x2, float y2, const char* cor
     l->area = CalcArea(l);
     strncpy(l->cor, cor, sizeof(l->cor) - 1);
     l->cor[sizeof(l->cor) - 1] = '\0';
-
+    
     return l;
 }
 

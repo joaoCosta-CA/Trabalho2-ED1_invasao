@@ -1,7 +1,7 @@
 #ifndef LEITOR_GEO_H
 #define LEITOR_GEO_H
 
-#include "../../estruturas_dados/lista/lista.h"
+#include "lista.h"
 
 /*
  * Lê o arquivo .geo especificado e insere as formas na lista.

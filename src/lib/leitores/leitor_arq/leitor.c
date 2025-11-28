@@ -4,9 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "leitor.h"
-#include "lista.h" // Substitui fila.h
+#include "lista.h"
 
-/* Função auxiliar para duplicar string (strdup não é C99 padrão estrito) */
+/* Função auxiliar para duplicar string */
 static char* duplicar_string(const char* s) {
     if (!s) return NULL;
     char* d = malloc(strlen(s) + 1);
@@ -42,7 +42,7 @@ DadosArquivo dados_arquivo_criar(const char *caminho_arquivo) {
     // Cria a lista genérica
     info->lista_linhas = createList();
 
-    // Extrai apenas o nome do arquivo (ex: /path/to/cidade.geo -> cidade.geo)
+    // Extrai apenas o nome do arquivo
     const char *barra = strrchr(caminho_arquivo, '/');
     if (barra) {
         info->nome_arquivo = duplicar_string(barra + 1);
@@ -60,7 +60,6 @@ DadosArquivo dados_arquivo_criar(const char *caminho_arquivo) {
         linha[strcspn(linha, "\r\n")] = 0;
         
         // Insere uma cópia da linha na lista
-        // O cast (void*) é implícito, mas 'duplicar_string' retorna char*
         insert(info->lista_linhas, duplicar_string(linha));
     }
 
@@ -78,10 +77,6 @@ void dados_arquivo_destruir(DadosArquivo dados) {
     if (info->caminho_completo) free(info->caminho_completo);
     if (info->nome_arquivo) free(info->nome_arquivo);
 
-    /* * Mágica da Lista Genérica:
-     * Passamos 'free' como callback. A lista percorrerá todos os nós,
-     * chamará free(item) em cada string armazenada e depois liberará os nós.
-     */
     if (info->lista_linhas) {
         killList(info->lista_linhas, free);
     }

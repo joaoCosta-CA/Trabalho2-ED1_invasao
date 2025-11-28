@@ -1,7 +1,7 @@
 #ifndef LEITOR_H
 #define LEITOR_H
 
-#include "lib/estruturas_dados/lista/lista.h"
+#include "lista.h"
 
 /* Tipo opaco para os dados do arquivo */
 typedef void *DadosArquivo;

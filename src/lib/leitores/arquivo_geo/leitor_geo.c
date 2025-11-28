@@ -1,13 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "leitor_geo.h"
-#include "lib/formas/enumFormas/formas.h"
-#include "lib/formas/circulo/circulo.h"
-#include "lib/formas/retangulo/retangulo.h"
-#include "lib/formas/linha/linha.h"
-#include "lib/formas/texto/texto.h"
-// #include "estilo_texto.h" // Descomente se tiver implementado estilo
+#include "forma.h"
+#include "circulo.h"
+#include "retangulo.h"
+#include "linha.h"
+#include "texto.h"
+// #include "estilo_texto.h"
 
 /* Funções auxiliares privadas */
 static void tratar_circulo(char *params, Lista l, int *max_id);

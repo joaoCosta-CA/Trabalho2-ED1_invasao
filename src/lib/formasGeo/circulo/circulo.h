@@ -29,7 +29,7 @@ Circulo CriarCirc(int id, float x, float y, double r, const char* corb, const ch
  * @pre o parâmetro 'c' deve referenciar um círculo válido.
  * @note a função não retorna erro; o chamador não deve assumir que o círculo foi destruído caso a memória não tenha sido liberada.
  */
-void DestruirCirc(Circulo c); 
+void destruirCirc(Circulo c); 
 
 /**
  * @brief função que obtém o identificador do círculo.

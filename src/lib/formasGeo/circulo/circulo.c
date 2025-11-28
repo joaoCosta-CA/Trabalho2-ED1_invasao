@@ -36,11 +36,11 @@ Circulo CriarCirc(int id, float x, float y, double r, const char* corb, const ch
     c->corb[sizeof(c->corb) - 1] = '\0';
     strncpy(c->corp, corp, sizeof(c->corp) - 1);
     c->corp[sizeof(c->corp) - 1] = '\0';
-
+    
     return c;
 }
 
-void DestruirCirc(Circulo c_g){
+void destruirCirc(Circulo c_g){
     circulo* c = (circulo*)c_g;
     if(c != NULL){
         free(c);

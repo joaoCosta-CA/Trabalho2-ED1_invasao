@@ -47,6 +47,9 @@ Posic insert(Lista l, Item item) {
 
 Item get(Lista l, Posic p) {
     StList *list = (StList *) l; // Cast apenas para validação, se necessário
+
+    if(!list) return NULL;
+
     Node *node = (Node *) p;
     if (!node) return NULL;
     return node->item;
@@ -54,19 +57,32 @@ Item get(Lista l, Posic p) {
 
 Posic getFirst(Lista l) {
     StList *list = (StList *) l;
+
+    if(!list) return NULL;
+
     return (Posic) list->head;
 }
 
 Posic getNext(Lista l, Posic p) {
+    (void) l; // Cast apenas para validação, se necessário
+
     Node *node = (Node *) p;
     if (!node) return NULL;
     return (Posic) node->next;
 }
 
-/* * Exemplo de destruição com callback para limpar a memória dos itens
- */
+Posic getLast(Lista l) {
+    StList *list = (StList *) l;
+
+    if(!list) return NULL;
+
+    return (Posic) list->tail;
+}
+
+
 void killList(Lista l, void (*freeItem)(void*)) {
     StList *list = (StList *) l;
+    if(!list) return;
     Node *current = list->head;
     Node *next_node;
 
@@ -84,4 +100,51 @@ void killList(Lista l, void (*freeItem)(void*)) {
     free(list); // Libera a estrutura da lista
 }
 
-/* ... Implementar as outras funções (remove, getLast, etc) seguindo a lógica ... */
+int length(Lista l) {
+    if (l == NULL) return 0;
+    StList *list = (StList *) l;
+    return list->length;
+}
+
+Item removePosic(Lista l, Posic p) {
+    if (l == NULL || p == NULL) return NULL;
+    
+    StList *list = (StList *) l;
+    Node *node = (Node *) p;
+    Item item = node->item; // Salva o item para retornar
+    
+    // Caso 1: O nó é o primeiro da lista (HEAD)
+    if (node == list->head) {
+        list->head = node->next;
+        if (list->head != NULL) {
+            list->head->prev = NULL;
+        } else {
+            // Se a lista ficou vazia, tail também deve ser NULL
+            list->tail = NULL;
+        }
+    }
+    // Caso 2: O nó não é o primeiro (tem anterior)
+    else {
+        node->prev->next = node->next;
+    }
+
+    // Caso 3: O nó é o último da lista (TAIL)
+    if (node == list->tail) {
+        list->tail = node->prev;
+        if (list->tail != NULL) {
+            list->tail->next = NULL;
+        } else {
+             // Caso já tratado no head, mas reforçando: lista vazia
+             list->head = NULL;
+        }
+    }
+    // Caso 4: O nó não é o último (tem próximo)
+    else if (node->next != NULL) {
+        node->next->prev = node->prev;
+    }
+
+    free(node); // Libera apenas a estrutura do nó, não o item
+    list->length--;
+    
+    return item;
+}

@@ -7,6 +7,7 @@
 #include "lib/leitores/arquivo_geo/leitor_geo.h"
 #include "lib/estruturas_dados/lista/lista.h"
 #include "lib/formas/enumFormas/formas.h"
+#include "lib/svg/svg.h"
 
 #define MAX_FULL_PATH 1024
 
@@ -24,14 +25,18 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    const char *base_input_path = get_option_value(argc, argv, "-e"); 
-    const char *geo_filename = get_option_value(argc, argv, "-f");
-    const char *output_path = get_option_value(argc, argv, "-o");
+    const char *base_input_path = get_option_value(argc, argv, "e"); 
+    const char *geo_filename = get_option_value(argc, argv, "f");
+    const char *output_path = get_option_value(argc, argv, "o");
     
 
     /* 3. Verificações de Segurança */
     if (geo_filename == NULL || output_path == NULL) {
         printf("Erro: Os parâmetros -f e -o são obrigatórios.\n");
+
+        printf("Recebido -f: %s\n", geo_filename ? geo_filename : "NULL");
+        printf("Recebido -o: %s\n", output_path ? output_path : "NULL");
+
         exit(EXIT_FAILURE);
     }
 
@@ -67,11 +72,13 @@ int main(int argc, char *argv[]) {
     // ATENÇÃO: Você precisa implementar essa função em um módulo separado (svg_writer.c)
     // gerar_svg_do_geo(lista_formas, svg_output_path); 
 
+    gerar_svg(lista_formas, svg_output_path);
+
     /* 7. Limpeza de Memória */
     // Libera a lista e todas as formas dentro dela usando o callback
     killList(lista_formas, destruir_forma_void);
 
-    printf("Concluído. Max ID encontrado: %d\n", max_id);
+    printf("Processamento concluido\n");
 
     return 0;
 }
