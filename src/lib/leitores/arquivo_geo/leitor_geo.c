@@ -8,13 +8,14 @@
 #include "retangulo.h"
 #include "linha.h"
 #include "texto.h"
-// #include "estilo_texto.h"
+#include "estilo_texto.h"
 
 /* Funções auxiliares privadas */
 static void tratar_circulo(char *params, Lista l, int *max_id);
 static void tratar_retangulo(char *params, Lista l, int *max_id);
 static void tratar_linha(char *params, Lista l, int *max_id);
 static void tratar_texto(char *params, Lista l, int *max_id);
+static void tratar_estilo_texto(char *params, Lista l, int *max_id);
 
 /* Função Principal */
 void ler_arquivo_geo(const char *diretorio_base, const char *nome_arquivo, Lista formas, int *max_id) {
@@ -51,8 +52,9 @@ void ler_arquivo_geo(const char *diretorio_base, const char *nome_arquivo, Lista
             tratar_linha(params, formas, max_id);
         } else if (strcmp(comando, "t") == 0) {
             tratar_texto(params, formas, max_id);
+        }else if (strcmp(comando, "ts") == 0) {
+            tratar_estilo_texto(params, formas, max_id);
         }
-        // else if (strcmp(comando, "ts") == 0) { ... }
     }
 
     fclose(arquivo);
@@ -94,6 +96,20 @@ static void tratar_circulo(char *params, Lista l, int *max_id) {
     // create_forma deve ser implementada em forma.c
     Forma *f = create_forma(CIRCULO, c); 
     insert(l, f);
+}
+
+static void tratar_estilo_texto(char *params, Lista l, int *max_id) {
+    char familia[64];
+    char peso[16];
+    double tamanho;
+
+    // Lê os parâmetros da string
+    if (sscanf(params, "%s %s %lf", familia, peso, &tamanho) == 3) {
+
+        void *estilo = create_estilo_texto(familia, peso, tamanho);
+
+        insert(l, create_forma(ESTILO_TEXTO, estilo));
+    }
 }
 
 static void tratar_retangulo(char *params, Lista l, int *max_id) {

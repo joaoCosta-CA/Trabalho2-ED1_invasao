@@ -3,10 +3,10 @@
 #include <assert.h>
 #include "arvore.h"
 
-int comparar_ints(void* a, void* b) {
-    int *ia = (int*)a;
-    int *ib = (int*)b;
-    return (*ia) - (*ib);
+int comparar_ints(const void* a, const void* b) {
+    int va = *(int*)a;
+    int vb = *(int*)b;
+    return va - vb;
 }
 
 void imprimir_int(void* item) {

@@ -47,5 +47,6 @@ $(TARGET): $(OBJS)
 
 clean:
 	rm -f $(OBJS) $(TARGET)
+	rm -f *.txt *.svg
 
 .PHONY: clean all

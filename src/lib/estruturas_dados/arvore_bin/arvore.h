@@ -9,7 +9,7 @@ typedef void *Arvore;
    Retorna > 0 se a > b
    Retorna 0 se a == b
 */
-typedef int (*Comparador)(void* a, void* b);
+typedef int (*Comparador)(const void* a, const void* b);
 
 /* Cria uma árvore vazia passando a função que sabe comparar os itens */
 Arvore tree_create(Comparador cmp);

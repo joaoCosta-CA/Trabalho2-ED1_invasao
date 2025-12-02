@@ -127,3 +127,14 @@ void retangulo_set_corb(Retangulo r_g, const char* corb){
         r->corb[sizeof(r->corb) - 1] = '\0';
     }
 }
+
+void* retangulo_clonar(void* r, int novo_id, double dx, double dy) {
+    double x = retangulo_get_x(r);
+    double y = retangulo_get_y(r);
+    double w = retangulo_get_larg(r);
+    double h = retangulo_get_altura(r);
+    const char* corb = retangulo_get_corb(r);
+    const char* corp = retangulo_get_corp(r);
+
+    return criarRec(novo_id, x + dx, y + dy, w, h, corb, corp);
+}

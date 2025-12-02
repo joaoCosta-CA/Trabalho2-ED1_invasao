@@ -125,4 +125,6 @@ void retangulo_set_corp(Retangulo r, const char* corp);
  */
 void retangulo_set_corb(Retangulo r, const char* corb);
 
+void* retangulo_clonar(void* r, int novo_id, double dx, double dy);
+
 #endif

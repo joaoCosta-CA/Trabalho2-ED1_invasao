@@ -21,4 +21,10 @@ void* get_dados_forma(Forma f);
 /* Destruidor */
 void destroy_forma(Forma f);
 
+int get_forma_id_generico(Forma f);
+
+void forma_atualizar_cor(Forma f, const char *cor);
+
+Forma forma_clonar(Forma f, int novo_id, double dx, double dy);
+
 #endif

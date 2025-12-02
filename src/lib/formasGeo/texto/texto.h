@@ -140,4 +140,6 @@ void texto_set_corb(Texto t, const char* corb);
  */
 void texto_set_conteudo(Texto t, const char* conteudo);
 
+void* texto_clonar(void* t, int novo_id, double dx, double dy);
+
 #endif

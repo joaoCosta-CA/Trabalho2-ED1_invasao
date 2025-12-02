@@ -128,4 +128,6 @@ void linha_set_y2(Linha l, float y2);
  */
 void linha_set_cor(Linha l, const char* cor);
 
+void* linha_clonar(void* l, int novo_id, double dx, double dy);
+
 #endif

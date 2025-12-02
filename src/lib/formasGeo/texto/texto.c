@@ -140,3 +140,14 @@ void texto_set_y(Texto t, float y){
     struct TextoStruct* texto = (struct TextoStruct*)t;
     texto->y = y;
 }
+
+void* texto_clonar(void* t, int novo_id, double dx, double dy) {
+    double x = texto_get_x(t);
+    double y = texto_get_y(t);
+    const char* corb = texto_get_corb(t);
+    const char* corp = texto_get_corp(t);
+    char ancora = texto_get_ancora(t);
+    const char* conteudo = texto_get_conteudo(t);
+
+    return criar_texto(novo_id, x + dx, y + dy, corb, corp, ancora, conteudo);
+}

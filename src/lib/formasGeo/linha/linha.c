@@ -125,3 +125,13 @@ void linha_set_cor(Linha l_g, const char* cor){
         l->cor[sizeof(l->cor) - 1] = '\0';
     }
 }
+
+void* linha_clonar(void* l, int novo_id, double dx, double dy) {
+    double x1 = linha_get_x1(l);
+    double y1 = linha_get_y1(l);
+    double x2 = linha_get_x2(l);
+    double y2 = linha_get_y2(l);
+    const char* cor = linha_get_cor(l);
+
+    return criarLinha(novo_id, x1 + dx, y1 + dy, x2 + dx, y2 + dy, cor);
+}

@@ -126,4 +126,6 @@ const char* circulo_get_corb(const Circulo c);
  * @note o parâmetro 'c' deve referenciar um objeto válido. Se 'c' for NULL, o comportamento é indefinido.
  */
  void circulo_set_corb(Circulo c, const char* corb);
+
+void* circulo_clonar(void* c, int novo_id, double dx, double dy);
 #endif

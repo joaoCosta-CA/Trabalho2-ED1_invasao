@@ -5,6 +5,7 @@
 #include "argumentos.h"
 #include "leitor.h"
 #include "leitor_geo.h"
+#include "leitor_qry.h"
 #include "lista.h"
 #include "forma.h"
 #include "svg.h"
@@ -27,9 +28,11 @@ int main(int argc, char *argv[]) {
     
     const char *base_input_path = get_option_value(argc, argv, "e"); 
     const char *geo_filename = get_option_value(argc, argv, "f");
+    const char *qry_filename = get_option_value(argc, argv, "q");
     const char *output_path = get_option_value(argc, argv, "o");
-    const char *arg_to = get_option_value(argc, argv, "-to");
-    const char *arg_i = get_option_value(argc, argv, "-i");
+    const char *arg_to = get_option_value(argc, argv, "to");
+    const char *arg_i = get_option_value(argc, argv, "i");
+
     
     /*Tipo de Ordenação e Cutoff*/
     char tipo_ordenacao = 'q'; 
@@ -87,7 +90,20 @@ int main(int argc, char *argv[]) {
     // ATENÇÃO: Você precisa implementar essa função em um módulo separado (svg_writer.c)
     // gerar_svg_do_geo(lista_formas, svg_output_path); 
 
-    gerar_svg(lista_formas, svg_output_path);
+    gerar_svg(lista_formas, NULL, NULL, 0, 0, svg_output_path);
+
+    if (qry_filename != NULL) {
+        
+        // Monta o caminho completo do QRY
+        char qry_full_path[MAX_FULL_PATH];
+        if (base_input_path) {
+            snprintf(qry_full_path, MAX_FULL_PATH, "%s/%s", base_input_path, qry_filename);
+        } else {
+            strncpy(qry_full_path, qry_filename, MAX_FULL_PATH - 1);
+        }
+
+        processar_qry(qry_full_path, output_path, nome_base, lista_formas);
+    }
 
     /* 7. Limpeza de Memória */
     // Libera a lista e todas as formas dentro dela usando o callback

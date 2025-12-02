@@ -112,3 +112,15 @@ void circulo_set_corb(Circulo c_g, const char* corB){
         c->corb[sizeof(c->corb) - 1] = '\0';
     }
 }
+
+void* circulo_clonar(void* c, int novo_id, double dx, double dy) {
+    // Recupera dados originais
+    double x = circulo_get_x(c);
+    double y = circulo_get_y(c);
+    double r = circulo_get_raio(c);
+    const char* corb = circulo_get_corb(c);
+    const char* corp = circulo_get_corp(c);
+
+    // Cria novo com deslocamento
+    return CriarCirc(novo_id, x + dx, y + dy, r, corb, corp);
+}
