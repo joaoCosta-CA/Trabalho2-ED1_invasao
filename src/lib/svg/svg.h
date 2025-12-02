@@ -9,10 +9,10 @@
  * - formas: Lista de formas originais (Pode ser NULL)
  * - anteparos: Lista de segmentos de barreira (Pode ser NULL)
  * - poligono: Lista de segmentos da visibilidade (Pode ser NULL)
- * - bx, by: Coordenadas do centro da bomba (se poligono != NULL)
  * - caminho_arquivo: Destino do arquivo
  */
+/* pontos_bombas: Lista de vetores double[2] contendo {x, y} */
 void gerar_svg(Lista formas, Lista anteparos, Lista poligono, 
-               double bx, double by, const char *caminho_arquivo);
+               Lista pontos_bombas, const char *caminho_arquivo);
 
 #endif

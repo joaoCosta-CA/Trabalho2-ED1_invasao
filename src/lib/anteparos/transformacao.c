@@ -43,22 +43,20 @@ Lista transformar_em_anteparos(Forma f, char flag_circulo, int *id_seg_counter) 
         }
 
         case RETANGULO: {
-            // [cite: 263] Retângulo vira 4 segmentos (lados)
             double x = retangulo_get_x(dados);
             double y = retangulo_get_y(dados);
             double w = retangulo_get_larg(dados);
             double h = retangulo_get_altura(dados);
             
-            // Lado inferior (ou superior dependendo do Y)
             insert(segmentos, create_segmento((*id_seg_counter)++, x, y, x + w, y));
-            // Lado direito
+            // Direita
             insert(segmentos, create_segmento((*id_seg_counter)++, x + w, y, x + w, y + h));
-            // Lado superior
+            // Baixo
             insert(segmentos, create_segmento((*id_seg_counter)++, x + w, y + h, x, y + h));
-            // Lado esquerdo
+            // Esquerda
             insert(segmentos, create_segmento((*id_seg_counter)++, x, y + h, x, y));
             break;
-        }
+}
 
         case LINHA: {
             //  Linha vira ela mesma

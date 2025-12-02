@@ -61,6 +61,10 @@ static Vertice criar_vertice_interno(double x, double y, double ang, double dist
     return (Vertice)v;
 }
 
+static int pontos_iguais(double x1, double y1, double x2, double y2) {
+    return dist_sq(x1, y1, x2, y2) < 1e-7;
+}
+
 /* Comparador para o Sort (agora faz cast para VerticeStruct) */
 int comparar_vertices(const void *a, const void *b) {
     VerticeStruct *v1 = *(VerticeStruct**)a;
@@ -75,8 +79,8 @@ int comparar_vertices(const void *a, const void *b) {
     // Se os ângulos são iguais, processamos REMOÇÃO (Fim=1) antes de INSERÇÃO (Inicio=0).
     // Queremos que Fim venha ANTES.
     if (v1->tipo != v2->tipo) {
-        // Se v1 é FIM (1), queremos que ele seja "menor" (-1)
-        return (v1->tipo == TIPO_FIM) ? -1 : 1;
+    // TIPO_INICIO (0) deve ser menor que TIPO_FIM (1)
+        return (v1->tipo == TIPO_INICIO) ? -1 : 1; 
     }
 
     // 3. Distância (Opcional)
@@ -255,34 +259,44 @@ int comparar_segmentos_arvore(const void* a, const void* b) {
 
     if (s1 == s2) return 0;
 
-    // Pega coordenadas
     double s1x1 = get_segmento_x1(s1), s1y1 = get_segmento_y1(s1);
     double s1x2 = get_segmento_x2(s1), s1y2 = get_segmento_y2(s1);
     double s2x1 = get_segmento_x1(s2), s2y1 = get_segmento_y1(s2);
     double s2x2 = get_segmento_x2(s2), s2y2 = get_segmento_y2(s2);
 
-    // --- ESTRATÉGIA DO PONTO MÉDIO ---
-    // Calculamos o ponto médio de S1 e traçamos um raio da Bomba até ele.
-    // Verificamos onde esse raio corta S2.
+    // --- 1. CASO CRÍTICO: VÉRTICES COMPARTILHADOS (Elimina a Diagonal) ---
+    // Se S1 e S2 nascem no mesmo ponto (o canto do retângulo)
+    if (pontos_iguais(s1x1, s1y1, s2x1, s2y1)) {
+        // Usamos a orientação (determinante) do outro extremo para desempatar
+        // Se o fim de S2 está à esquerda de S1, S2 está na frente.
+        double o = orientacao(BOMBA_X, BOMBA_Y, s1x2, s1y2, s2x2, s2y2);
+        return (o > 0) ? -1 : 1; 
+    }
     
+    // Se um é continuação do outro (S1 começa onde S2 termina)
+    if (pontos_iguais(s1x1, s1y1, s2x2, s2y2)) {
+        double o = orientacao(BOMBA_X, BOMBA_Y, s1x2, s1y2, s2x1, s2y1);
+        return (o > 0) ? -1 : 1;
+    }
+    
+    if (pontos_iguais(s2x1, s2y1, s1x2, s1y2)) {
+        double o = orientacao(BOMBA_X, BOMBA_Y, s2x2, s2y2, s1x1, s1y1);
+        return (o > 0) ? 1 : -1;
+    }
+
+    // --- 2. ESTRATÉGIA DO PONTO MÉDIO (Para casos gerais) ---
     double mid1_x = (s1x1 + s1x2) / 2.0;
     double mid1_y = (s1y1 + s1y2) / 2.0;
     
-    // Distância da Bomba até o meio de S1
     double dist_s1 = dist_sq(BOMBA_X, BOMBA_Y, mid1_x, mid1_y);
-    
-    // Onde o raio (Bomba->MeioS1) corta S2?
     double dist_s2_no_raio_s1 = distancia_interseccao_raio(s2, mid1_x, mid1_y);
 
     if (dist_s2_no_raio_s1 >= 0) {
-        // Se S2 corta o raio, comparamos as distâncias
-        // Se S2 está mais perto (dist menor), então S2 < S1 (S1 é maior/1)
-        if (dist_s2_no_raio_s1 < dist_s1 - 1e-7) return 1;  // S2 ganha (S1 > S2)
-        if (dist_s2_no_raio_s1 > dist_s1 + 1e-7) return -1; // S1 ganha (S1 < S2)
+        if (dist_s2_no_raio_s1 < dist_s1 - 1e-7) return 1;  // S2 ganha
+        if (dist_s2_no_raio_s1 > dist_s1 + 1e-7) return -1; // S1 ganha
     }
 
-    // --- PROVA REAL (INVERSO) ---
-    // Fazemos o mesmo usando o meio de S2, para garantir
+    // Prova real (Inverso)
     double mid2_x = (s2x1 + s2x2) / 2.0;
     double mid2_y = (s2y1 + s2y2) / 2.0;
     
@@ -290,15 +304,11 @@ int comparar_segmentos_arvore(const void* a, const void* b) {
     double dist_s1_no_raio_s2 = distancia_interseccao_raio(s1, mid2_x, mid2_y);
 
     if (dist_s1_no_raio_s2 >= 0) {
-        // Se S1 corta o raio de S2 e é mais perto
         if (dist_s1_no_raio_s2 < dist_s2 - 1e-7) return -1; // S1 ganha
         if (dist_s1_no_raio_s2 > dist_s2 + 1e-7) return 1;  // S2 ganha
     }
 
-    // Se a geometria falhar (não se sobrepõem angularmente nos meios), 
-    // usamos o ID para manter a árvore estável e não crachar.
-    // Lembre-se: em Plane Sweep, nós só comparamos segmentos que compartilham o raio de varredura.
-    // Se chegamos aqui, é um caso de borda ou erro de precisão.
+    // Desempate por ID
     int id1 = get_segmento_id(s1);
     int id2 = get_segmento_id(s2);
     return (id1 < id2) ? -1 : 1;

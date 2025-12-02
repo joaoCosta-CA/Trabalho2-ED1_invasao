@@ -20,9 +20,9 @@
 
 // Protótipos das funções auxiliares
 static void tratar_a(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, int *id_seg);
-static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, const char *output_dir, Lista registros_visuais);
-static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros_visuais);
-static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, int *id_global, Lista registros_visuais);
+static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, const char *output_dir, Lista registros_visuais, Lista pontos_bombas);
+static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros_visuais, Lista pontos_bombas  );
+static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, int *id_global, Lista registros_visuais, Lista pontos_bombas);
 static void remover_segmento_da_lista(Lista l, Segmento s);
 static void processar_destruicao(Lista formas, Lista poligono_visivel, FILE *txt);
 static Lista obter_poligono_explosao(double x, double y, Lista formas, Lista anteparos, int *id_counter);
@@ -56,6 +56,7 @@ void processar_qry(const char *path_qry, const char *output_dir, const char *nom
     // Inicialmente vazia, populada pelo comando 'a'
     Lista lista_anteparos = createList();
     Lista registros_visuais = createList();
+    Lista pontos_bombas = createList();
     int contador_id_segmento = 1; // IDs únicos para novos segmentos
 
     char linha[1024];
@@ -70,13 +71,13 @@ void processar_qry(const char *path_qry, const char *output_dir, const char *nom
             tratar_a(params, lista_formas, lista_anteparos, txt, &contador_id_segmento);
         } 
         else if (strcmp(comando, "d") == 0) {
-            tratar_d(params, lista_formas, lista_anteparos, txt, output_dir, registros_visuais);
+            tratar_d(params, lista_formas, lista_anteparos, txt, output_dir, registros_visuais, pontos_bombas);
         }
         else if (strcmp(comando, "p") == 0) {
-            tratar_p(params, lista_formas, lista_anteparos, txt, output_dir, registros_visuais);
+            tratar_p(params, lista_formas, lista_anteparos, txt, output_dir, registros_visuais, pontos_bombas);
         }
         else if (strcmp(comando, "cln") == 0) {
-            tratar_cln(params, lista_formas, lista_anteparos, txt, output_dir, &contador_id_segmento, registros_visuais);
+            tratar_cln(params, lista_formas, lista_anteparos, txt, output_dir, &contador_id_segmento, registros_visuais, pontos_bombas);
         }
     }
 
@@ -92,7 +93,7 @@ void processar_qry(const char *path_qry, const char *output_dir, const char *nom
     // Aqui usamos 'registros_visuais' como o argumento de polígono para desenhar tudo
     // Passamos NULL no anteparo pois no final talvez não queiramos ver as paredes pretas, 
     // ou passamos lista_anteparos se quiser ver o que sobrou de parede.
-    gerar_svg(lista_formas, lista_anteparos, registros_visuais, 0, 0, nome_final_svg);
+    gerar_svg(lista_formas, lista_anteparos, registros_visuais, pontos_bombas, nome_final_svg);
 
     // --- LIMPEZA ---
     fclose(qry);
@@ -166,7 +167,7 @@ static void tratar_a(char *params, Lista lista_formas, Lista lista_anteparos, FI
 /* =========================================================
    STUB DO COMANDO 'd'
    ========================================================= */
-static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, const char *output_dir, Lista registros_visuais) {
+static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, const char *output_dir, Lista registros_visuais, Lista pontos_bombas) {
     double x, y;
     char sfx[100];
     
@@ -203,6 +204,11 @@ static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FI
 
     fprintf(txt, "  (Paredes do mundo inseridas: %.1f, %.1f a %.1f, %.1f)\n", min_x, min_y, max_x, max_y);
 
+    double *pt = malloc(2 * sizeof(double));
+    pt[0] = x;
+    pt[1] = y;
+    insert(pontos_bombas, pt);
+
     // 3. EXECUTA O ALGORITMO DE VISIBILIDADE
     // Usa as coordenadas perturbadas (x_calc, y_calc) para estabilidade numérica
     Lista poligono_luz = calcular_visibilidade(x_calc, y_calc, lista_anteparos);
@@ -216,6 +222,8 @@ static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FI
 
     // 5. Gera SVG de Debug
     if (strcmp(sfx, "-") != 0) {
+        Lista temp_bomba = createList();
+        insert(temp_bomba, pt);
         char nome_arq_debug[1024];
         
         // Salva no diretório correto recebido da main
@@ -224,8 +232,9 @@ static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FI
         else
             sprintf(nome_arq_debug, "debug_bomba_%s.svg", sfx);
         
-        // Passa TODOS os 6 argumentos necessários: formas, anteparos, poligono, x, y, caminho
-        gerar_svg(lista_formas, lista_anteparos, poligono_luz, x, y, nome_arq_debug);
+        gerar_svg(lista_formas, lista_anteparos, poligono_luz, temp_bomba, nome_arq_debug);
+
+        killList(temp_bomba, NULL);
     }
 
     // 6. LIMPEZA
@@ -247,15 +256,23 @@ static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FI
     IMPLEMENTAÇÃO DO COMANDO 'cln'
 ===================================================*/
 
-static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, int *id_global, Lista registros_visuais) {
+static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, int *id_global, Lista registros_visuais, Lista pontos_bombas) {
     double x, y, dx, dy;
     char sfx[100];
     
     sscanf(params, "%lf %lf %lf %lf %s", &x, &y, &dx, &dy, sfx);
     fprintf(txt, "\n[*] Comando 'cln': Clonar em (%.2f, %.2f) Off(%.2f, %.2f)\n", x, y, dx, dy);
 
+    double x_calc = x + 0.00001;
+    double y_calc = y + 0.00001;
+
+    double *pt = malloc(2 * sizeof(double));
+    pt[0] = x;
+    pt[1] = y;
+    insert(pontos_bombas, pt);
+
     // 1. Calcula a área atingida
-    Lista poligono = obter_poligono_explosao(x, y, formas, anteparos, id_global);
+    Lista poligono = obter_poligono_explosao(x_calc, y_calc, formas, anteparos, id_global);
 
     acumular_desenho(registros_visuais, poligono);
 
@@ -289,11 +306,13 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
 
     // 4. SVG de Debug
     if (strcmp(sfx, "-") != 0) {
+        Lista temp_bomba = createList();
+        insert(temp_bomba, pt);
         char path[1024];
         if (out_dir) sprintf(path, "%s/debug_clone_%s.svg", out_dir, sfx);
         else sprintf(path, "debug_clone_%s.svg", sfx);
         
-        gerar_svg(formas, anteparos, poligono, x, y, path);
+        gerar_svg(formas, anteparos, poligono, temp_bomba, path);
     }
     
     killList(poligono, destroy_segmento_void);
@@ -302,7 +321,7 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
 /*=================================================
     IMPLEMENTAÇÃO DO COMANDO 'p'
 ===================================================*/
-static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros_visuais) {
+static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros_visuais, Lista pontos_bombas) {
     double x, y;
     char cor[100], sfx[100];
     int id_dummy = 80000;
@@ -310,8 +329,16 @@ static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, con
     sscanf(params, "%lf %lf %s %s", &x, &y, cor, sfx);
     fprintf(txt, "\n[*] Comando 'p': Pintar em (%.2f, %.2f) cor: %s\n", x, y, cor);
 
+    double x_calc = x + 0.00001;
+    double y_calc = y + 0.00001;
+
+    double *pt = malloc(2 * sizeof(double));
+    pt[0] = x;
+    pt[1] = y;
+    insert(pontos_bombas, pt);
+
     // 1. Calcula a área atingida
-    Lista poligono = obter_poligono_explosao(x, y, formas, anteparos, &id_dummy);
+    Lista poligono = obter_poligono_explosao(x_calc, y_calc, formas, anteparos, &id_dummy);
 
     acumular_desenho(registros_visuais, poligono);
 
@@ -328,11 +355,13 @@ static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, con
 
     // 3. SVG de Debug
     if (strcmp(sfx, "-") != 0) {
+        Lista temp_bomba = createList();
+        insert(temp_bomba, pt);
         char path[1024];
         if (out_dir) sprintf(path, "%s/debug_pintura_%s.svg", out_dir, sfx);
         else sprintf(path, "debug_pintura_%s.svg", sfx);
         
-        gerar_svg(formas, anteparos, poligono, x, y, path);
+        gerar_svg(formas, anteparos, poligono, temp_bomba, path);
     }
     
     // Limpeza do polígono

@@ -28,7 +28,7 @@ static void escrever_linha(FILE *svg, void *dados);
 static void escrever_texto(FILE *svg, void *dados, const char *family, const char *weight, double size);
 
 void gerar_svg(Lista formas, Lista anteparos, Lista poligono, 
-               double bx, double by, const char *caminho_arquivo) {
+               Lista pontos_bombas, const char *caminho_arquivo) {
                
     FILE *svg = fopen(caminho_arquivo, "w");
     if (!svg) {
@@ -36,11 +36,14 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
         return;
     }
 
-    // 1. CÁLCULO DA VIEWBOX (CÂMERA)
-    // Usa o módulo 'limites' para enquadrar tudo perfeitamente
-    // Se 'formas' for NULL (ex: teste unitário só de visibilidade), cria um padrão
-    double min_x = 0, min_y = 0, max_x = 1000, max_y = 1000;
+    // =========================================================
+    // FASE 1: CÁLCULO DOS LIMITES TOTAIS (Expandir a Câmera)
+    // =========================================================
     
+    double min_x = 0, min_y = 0, max_x = 1000, max_y = 1000;
+    int inicializado = 0; 
+
+    // 1.1 Limites das Formas (O básico)
     if (formas && length(formas) > 0) {
         Limites box = calcular_limites_mundo(formas);
         min_x = get_limites_min_x(box);
@@ -48,11 +51,57 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
         max_x = get_limites_max_x(box);
         max_y = get_limites_max_y(box);
         destruir_limites(box);
+        inicializado = 1;
     } 
-    // Se não tem formas, mas tem anteparos (caso de teste), poderia calcular limites deles
-    // Mas vamos assumir o padrão 0-1000 se não houver formas.
 
-    // Margem de segurança
+    // 1.2 Expandir com o Polígono de Visibilidade
+    if (poligono) {
+        Posic p = getFirst(poligono);
+        while (p) {
+            void *s = get(poligono, p);
+            double x1 = get_segmento_x1(s); double y1 = get_segmento_y1(s);
+            double x2 = get_segmento_x2(s); double y2 = get_segmento_y2(s);
+            
+            if (!inicializado) {
+                min_x = x1; max_x = x1; min_y = y1; max_y = y1;
+                inicializado = 1;
+            }
+
+            if (x1 < min_x) min_x = x1; if (x1 > max_x) max_x = x1;
+            if (y1 < min_y) min_y = y1; if (y1 > max_y) max_y = y1;
+            if (x2 < min_x) min_x = x2; if (x2 > max_x) max_x = x2;
+            if (y2 < min_y) min_y = y2; if (y2 > max_y) max_y = y2;
+            
+            p = getNext(poligono, p);
+        }
+    }
+
+    // 1.3 Expandir com as Bombas
+    if (pontos_bombas) {
+        Posic p = getFirst(pontos_bombas);
+        while (p) {
+            double *pt = (double*) get(pontos_bombas, p);
+            double bx = pt[0];
+            double by = pt[1];
+
+            if (!inicializado) {
+                min_x = bx; max_x = bx; min_y = by; max_y = by;
+                inicializado = 1;
+            }
+
+            if (bx < min_x) min_x = bx;
+            if (bx > max_x) max_x = bx;
+            if (by < min_y) min_y = by;
+            if (by > max_y) max_y = by;
+
+            p = getNext(pontos_bombas, p);
+        }
+    }
+
+    // =========================================================
+    // FASE 2: ESCRITA DO ARQUIVO
+    // =========================================================
+
     double margem = 50.0;
     double vb_x = min_x - margem;
     double vb_y = min_y - margem;
@@ -62,12 +111,11 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
     fprintf(svg, "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" viewBox=\"%.2f %.2f %.2f %.2f\">\n",
             vb_x, vb_y, vb_w, vb_h);
 
-    // Variáveis de Estado de Fonte
     char font_family[100] = "sans-serif";
     char font_weight[20]  = "normal";
     double font_size      = 12.0;
 
-    // 2. CAMADA 1: FORMAS (O Mundo Colorido)
+    // 2.1 Desenha Formas
     if (formas) {
         Posic p = getFirst(formas);
         while (p) {
@@ -80,7 +128,6 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
                 case RETANGULO: escrever_retangulo(svg, dados); break;
                 case LINHA:     escrever_linha(svg, dados); break;
                 case ESTILO_TEXTO: {
-                    // Atualiza estado da fonte
                     const char *fam = get_estilo_familia(dados);
                     const char *w   = get_estilo_peso(dados);
                     if (fam) strcpy(font_family, fam);
@@ -99,20 +146,19 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
         }
     }
 
-    // 3. CAMADA 2: ANTEPAROS (Linhas Pretas - Debug)
+    // 2.2 Desenha Anteparos
     if (anteparos) {
         fprintf(svg, "\t\n");
         Posic p = getFirst(anteparos);
         while (p) {
             void *s = get(anteparos, p);
-            // Desenha linha preta fina
             fprintf(svg, "\t<line x1=\"%.2f\" y1=\"%.2f\" x2=\"%.2f\" y2=\"%.2f\" stroke=\"black\" stroke-width=\"2\" />\n",
                     get_segmento_x1(s), get_segmento_y1(s), get_segmento_x2(s), get_segmento_y2(s));
             p = getNext(anteparos, p);
         }
     }
 
-    // 4. CAMADA 3: POLÍGONO DE VISIBILIDADE (Vermelho)
+    // 2.3 Desenha Polígono de Visibilidade (COM FILTRO VISUAL ATUALIZADO)
     if (poligono) {
         fprintf(svg, "\t\n");
         Posic p = getFirst(poligono);
@@ -123,21 +169,55 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
             double x2 = get_segmento_x2(s);
             double y2 = get_segmento_y2(s);
 
-            // FILTRO VISUAL: Remove a linha horizontal do eixo zero (estética)
-            int horiz = fabs(y1 - y2) < 0.001;
-            int altura = fabs(y1 - by) < 0.001;
-            int direita = (x1 > bx + 0.1) || (x2 > bx + 0.1);
+            // --- INÍCIO DO FILTRO VISUAL ---
+            int eh_linha_fantasma = 0;
 
-            if (!(horiz && altura && direita)) {
-                // Linha vermelha grossa semi-transparente
+            // Verifica se este segmento é o "Raio Zero" de ALGUMA das bombas
+            if (pontos_bombas) {
+                Posic pb = getFirst(pontos_bombas);
+                while (pb) {
+                    double *pt = (double*) get(pontos_bombas, pb);
+                    double bx = pt[0];
+                    double by = pt[1];
+
+                    // Critérios para ser a linha fantasma:
+                    // 1. É Horizontal? (y1 ~= y2)
+                    int horiz = fabs(y1 - y2) < 0.001;
+                    // 2. Está na altura da bomba? (y1 ~= by)
+                    int altura = fabs(y1 - by) < 0.001;
+                    // 3. Está à direita da bomba? (x > bx)
+                    int direita = (x1 > bx + 0.1) || (x2 > bx + 0.1);
+
+                    if (horiz && altura && direita) {
+                        eh_linha_fantasma = 1;
+                        break; // Já achamos, não precisa testar outras bombas
+                    }
+
+                    pb = getNext(pontos_bombas, pb);
+                }
+            }
+            
+            // Se NÃO for linha fantasma, desenha
+            if (!eh_linha_fantasma) {
                 fprintf(svg, "\t<line x1=\"%.2f\" y1=\"%.2f\" x2=\"%.2f\" y2=\"%.2f\" stroke=\"red\" stroke-width=\"4\" opacity=\"0.5\" />\n",
                         x1, y1, x2, y2);
             }
+            // --- FIM DO FILTRO ---
+            
             p = getNext(poligono, p);
         }
+    }
 
-        // Desenha o ponto da bomba apenas se houver polígono (contexto de explosão)
-        fprintf(svg, "\t<circle cx=\"%.2f\" cy=\"%.2f\" r=\"5\" fill=\"yellow\" stroke=\"red\" />\n", bx, by);
+    // 2.4 Desenha Bombas
+    if (pontos_bombas) {
+        fprintf(svg, "\t\n");
+        Posic p = getFirst(pontos_bombas);
+        while (p) {
+            double *pt = (double*) get(pontos_bombas, p);
+            fprintf(svg, "\t<circle cx=\"%.2f\" cy=\"%.2f\" r=\"5\" fill=\"yellow\" stroke=\"red\" stroke-width=\"2\" />\n", 
+                    pt[0], pt[1]);
+            p = getNext(pontos_bombas, p);
+        }
     }
 
     fprintf(svg, "</svg>");

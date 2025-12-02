@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
     // ATENÇÃO: Você precisa implementar essa função em um módulo separado (svg_writer.c)
     // gerar_svg_do_geo(lista_formas, svg_output_path); 
 
-    gerar_svg(lista_formas, NULL, NULL, 0, 0, svg_output_path);
+    gerar_svg(lista_formas, NULL, NULL, NULL, svg_output_path);
 
     if (qry_filename != NULL) {
         
