@@ -20,18 +20,18 @@
 
 // Protótipos das funções auxiliares
 static void tratar_a(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, int *id_seg);
-static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, const char *output_dir, Lista registros_visuais, Lista pontos_bombas);
-static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros_visuais, Lista pontos_bombas  );
-static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, int *id_global, Lista registros_visuais, Lista pontos_bombas);
+static Lista obter_poligono_explosao(double x, double y, Lista formas, Lista anteparos, int *id_counter, char tipo_ord, int cutoff);
+static void tratar_d(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros, Lista pontos_bombas, char tipo_ord, int cutoff);
+static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros, Lista pontos_bombas, char tipo_ord, int cutoff);
+static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, int *id_global, Lista registros, Lista pontos_bombas, char tipo_ord, int cutoff);
 static void remover_segmento_da_lista(Lista l, Segmento s);
 static void processar_destruicao(Lista formas, Lista poligono_visivel, FILE *txt);
-static Lista obter_poligono_explosao(double x, double y, Lista formas, Lista anteparos, int *id_counter);
 static int forma_foi_atingida(Forma f, Lista poligono);
 static void acumular_desenho(Lista acumulador, Lista poligono_atual);
 static void extrair_nome_base(const char *path, char *dest);
 static void destroy_segmento_void(void *p);
 
-void processar_qry(const char *path_qry, const char *output_dir, const char *nome_base_geo, Lista lista_formas) {
+void processar_qry(const char *path_qry, const char *output_dir, const char *nome_base_geo, Lista lista_formas, char tipo_ord, int cutoff) {
     FILE *qry = fopen(path_qry, "r");
     if (!qry) {
         perror("Erro ao abrir .qry");
@@ -71,13 +71,13 @@ void processar_qry(const char *path_qry, const char *output_dir, const char *nom
             tratar_a(params, lista_formas, lista_anteparos, txt, &contador_id_segmento);
         } 
         else if (strcmp(comando, "d") == 0) {
-            tratar_d(params, lista_formas, lista_anteparos, txt, output_dir, registros_visuais, pontos_bombas);
+            tratar_d(params, lista_formas, lista_anteparos, txt, output_dir, registros_visuais, pontos_bombas, tipo_ord, cutoff);
         }
         else if (strcmp(comando, "p") == 0) {
-            tratar_p(params, lista_formas, lista_anteparos, txt, output_dir, registros_visuais, pontos_bombas);
+            tratar_p(params, lista_formas, lista_anteparos, txt, output_dir, registros_visuais, pontos_bombas, tipo_ord, cutoff);
         }
         else if (strcmp(comando, "cln") == 0) {
-            tratar_cln(params, lista_formas, lista_anteparos, txt, output_dir, &contador_id_segmento, registros_visuais, pontos_bombas);
+            tratar_cln(params, lista_formas, lista_anteparos, txt, output_dir, &contador_id_segmento, registros_visuais, pontos_bombas, tipo_ord, cutoff);
         }
     }
 
@@ -99,13 +99,12 @@ void processar_qry(const char *path_qry, const char *output_dir, const char *nom
     fclose(qry);
     fclose(txt);
     
-    // Limpa a memória acumulada
     killList(registros_visuais, destroy_segmento_void);
     
-    // Os anteparos são temporários para o QRY ou devem persistir?
-    // Geralmente limpamos aqui se não forem usados depois.
-    // Use um callback que chame destroy_segmento
-    // killList(lista_anteparos, destroy_segmento_wrapper); 
+    killList(lista_anteparos, destroy_segmento_void);
+
+    killList(pontos_bombas, free);
+
 }
 
 /* =========================================================
@@ -167,7 +166,7 @@ static void tratar_a(char *params, Lista lista_formas, Lista lista_anteparos, FI
 /* =========================================================
    STUB DO COMANDO 'd'
    ========================================================= */
-static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, const char *output_dir, Lista registros_visuais, Lista pontos_bombas) {
+static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, const char *output_dir, Lista registros_visuais, Lista pontos_bombas, char tipo_ord, int cutoff) {
     double x, y;
     char sfx[100];
     
@@ -211,7 +210,7 @@ static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FI
 
     // 3. EXECUTA O ALGORITMO DE VISIBILIDADE
     // Usa as coordenadas perturbadas (x_calc, y_calc) para estabilidade numérica
-    Lista poligono_luz = calcular_visibilidade(x_calc, y_calc, lista_anteparos);
+    Lista poligono_luz = calcular_visibilidade(x_calc, y_calc, lista_anteparos, tipo_ord, cutoff);
 
     acumular_desenho(registros_visuais, poligono_luz);
     
@@ -256,7 +255,7 @@ static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FI
     IMPLEMENTAÇÃO DO COMANDO 'cln'
 ===================================================*/
 
-static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, int *id_global, Lista registros_visuais, Lista pontos_bombas) {
+static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, int *id_global, Lista registros_visuais, Lista pontos_bombas, char tipo_ord, int cutoff) {
     double x, y, dx, dy;
     char sfx[100];
     
@@ -272,7 +271,7 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
     insert(pontos_bombas, pt);
 
     // 1. Calcula a área atingida
-    Lista poligono = obter_poligono_explosao(x_calc, y_calc, formas, anteparos, id_global);
+    Lista poligono = obter_poligono_explosao(x_calc, y_calc, formas, anteparos, id_global, tipo_ord, cutoff);
 
     acumular_desenho(registros_visuais, poligono);
 
@@ -321,7 +320,7 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
 /*=================================================
     IMPLEMENTAÇÃO DO COMANDO 'p'
 ===================================================*/
-static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros_visuais, Lista pontos_bombas) {
+static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros_visuais, Lista pontos_bombas, char tipo_ord, int cutoff) {
     double x, y;
     char cor[100], sfx[100];
     int id_dummy = 80000;
@@ -338,7 +337,7 @@ static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, con
     insert(pontos_bombas, pt);
 
     // 1. Calcula a área atingida
-    Lista poligono = obter_poligono_explosao(x_calc, y_calc, formas, anteparos, &id_dummy);
+    Lista poligono = obter_poligono_explosao(x_calc, y_calc, formas, anteparos, &id_dummy, tipo_ord, cutoff);
 
     acumular_desenho(registros_visuais, poligono);
 
@@ -445,7 +444,7 @@ static int forma_foi_atingida(Forma f, Lista poligono) {
     return 0;
 }
 
-static Lista obter_poligono_explosao(double x, double y, Lista formas, Lista anteparos, int *id_counter) {
+static Lista obter_poligono_explosao(double x, double y, Lista formas, Lista anteparos, int *id_counter, char tipo_ord, int cutoff) {
     // 1. Calcula Limites
     Limites box = calcular_limites_mundo(formas);
     double min_x = get_limites_min_x(box) - 50.0;
@@ -464,7 +463,7 @@ static Lista obter_poligono_explosao(double x, double y, Lista formas, Lista ant
     insert(anteparos, p3); insert(anteparos, p4);
 
     // 3. Roda Algoritmo (com perturbação)
-    Lista poligono = calcular_visibilidade(x + 0.00001, y + 0.00001, anteparos);
+    Lista poligono = calcular_visibilidade(x + 0.00001, y + 0.00001, anteparos, tipo_ord, cutoff);
 
     // 4. Remove Paredes
     // Nota: Dependendo da sua lista, remover pelo ponteiro pode ser lento ou exigir função específica.

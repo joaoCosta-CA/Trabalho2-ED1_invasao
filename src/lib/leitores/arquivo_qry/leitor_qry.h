@@ -10,6 +10,8 @@
  * - nome_base_geo: Nome do arquivo geo (sem extensão) para compor o nome do relatório
  * - lista_formas: Lista contendo as formas lidas do .geo (será modificada!)
  */
-void processar_qry(const char *path_qry, const char *output_dir, const char *nome_base_geo, Lista lista_formas);
+/* Assinatura Atualizada */
+void processar_qry(const char *path_qry, const char *output_dir, const char *nome_base_geo, 
+                   Lista lista_formas, char tipo_ord, int cutoff);
 
 #endif

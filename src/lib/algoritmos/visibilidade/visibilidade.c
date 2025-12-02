@@ -335,7 +335,7 @@ static void obter_ponto_interseccao(double bx, double by, Vertice v, void* seg, 
     calcular_interseccao(bx, by, vx, vy, sx1, sy1, sx2, sy2, out_x, out_y);
 }
 
-Lista calcular_visibilidade(double bx, double by, Lista anteparos) {
+Lista calcular_visibilidade(double bx, double by, Lista anteparos, char tipo_ord, int cutoff) {
     
     // 1. Configura o contexto geométrico (para o comparador da árvore funcionar)
     set_contexto_bomba(bx, by);
@@ -343,7 +343,7 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos) {
     // 2. Prepara os Eventos (Extrai vértices e ordena angularmente)
     int qtd_eventos = 0;
     // O PDF pede MergeSort ('m') e cutoff 10 por padrão, mas pode ser configurável
-    Vertice *eventos = preparar_vertices_ordenados(bx, by, anteparos, &qtd_eventos, 'm', 10);
+    Vertice *eventos = preparar_vertices_ordenados(bx, by, anteparos, &qtd_eventos, tipo_ord, cutoff);
 
     // 3. Inicializa Estruturas
     Lista poligono_visivel = createList();

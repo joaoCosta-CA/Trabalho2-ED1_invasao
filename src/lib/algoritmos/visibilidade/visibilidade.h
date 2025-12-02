@@ -26,7 +26,7 @@ Vertice* preparar_vertices_ordenados(double centro_x, double centro_y,
  * Executa o Algoritmo de Varredura (Sweep Line).
  * Retorna uma Lista de Segmentos que formam o polígono de visibilidade.
  */
-Lista calcular_visibilidade(double x, double y, Lista anteparos);
+Lista calcular_visibilidade(double x, double y, Lista anteparos, char tipo_ord, int cutoff);
 
 /* Getters */
 double get_vertice_x(Vertice v);

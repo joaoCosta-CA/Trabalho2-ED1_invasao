@@ -67,10 +67,14 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
                 inicializado = 1;
             }
 
-            if (x1 < min_x) min_x = x1; if (x1 > max_x) max_x = x1;
-            if (y1 < min_y) min_y = y1; if (y1 > max_y) max_y = y1;
-            if (x2 < min_x) min_x = x2; if (x2 > max_x) max_x = x2;
-            if (y2 < min_y) min_y = y2; if (y2 > max_y) max_y = y2;
+            if (x1 < min_x) min_x = x1;
+            if (x1 > max_x) max_x = x1;
+            if (y1 < min_y) min_y = y1;
+            if (y1 > max_y) max_y = y1;
+            if (x2 < min_x) min_x = x2;
+            if (x2 > max_x) max_x = x2;
+            if (y2 < min_y) min_y = y2; 
+            if (y2 > max_y) max_y = y2;
             
             p = getNext(poligono, p);
         }
@@ -157,8 +161,6 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
             p = getNext(anteparos, p);
         }
     }
-
-    // 2.3 Desenha Polígono de Visibilidade (COM FILTRO VISUAL ATUALIZADO)
     if (poligono) {
         fprintf(svg, "\t\n");
         Posic p = getFirst(poligono);
@@ -180,12 +182,8 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
                     double bx = pt[0];
                     double by = pt[1];
 
-                    // Critérios para ser a linha fantasma:
-                    // 1. É Horizontal? (y1 ~= y2)
                     int horiz = fabs(y1 - y2) < 0.001;
-                    // 2. Está na altura da bomba? (y1 ~= by)
                     int altura = fabs(y1 - by) < 0.001;
-                    // 3. Está à direita da bomba? (x > bx)
                     int direita = (x1 > bx + 0.1) || (x2 > bx + 0.1);
 
                     if (horiz && altura && direita) {
@@ -197,12 +195,10 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
                 }
             }
             
-            // Se NÃO for linha fantasma, desenha
             if (!eh_linha_fantasma) {
                 fprintf(svg, "\t<line x1=\"%.2f\" y1=\"%.2f\" x2=\"%.2f\" y2=\"%.2f\" stroke=\"red\" stroke-width=\"4\" opacity=\"0.5\" />\n",
                         x1, y1, x2, y2);
             }
-            // --- FIM DO FILTRO ---
             
             p = getNext(poligono, p);
         }
@@ -246,10 +242,7 @@ static void escrever_retangulo(FILE *svg, void *dados) {
     const char *corb = retangulo_get_corb(dados);
     const char *corp = retangulo_get_corp(dados);
 
-    // Nota: SVG desenha retângulo a partir do canto superior esquerdo.
-    // O PDF [cite: 230] diz que a âncora é canto inferior esquerdo? 
-    // SE FOR: você precisa ajustar o Y aqui: y_svg = y_lido - altura.
-    // Assumindo comportamento padrão (x,y é topo-esquerda):
+    // ajustar o Y aqui: y_svg = y_lido - altura.
     fprintf(svg, "\t<rect x=\"%.2f\" y=\"%.2f\" width=\"%.2f\" height=\"%.2f\" stroke=\"%s\" fill=\"%s\" stroke-width=\"1\" />\n",
             x, y, w, h, corb, corp);
 }
