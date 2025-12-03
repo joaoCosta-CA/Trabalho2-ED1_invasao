@@ -3,6 +3,7 @@
 #include <float.h> // Para DBL_MAX
 #include "limites.h"
 #include "forma.h"
+#include "segmento.h"
 
 // Includes específicos para pegar coordenadas
 #include "circulo.h"
@@ -99,4 +100,36 @@ double get_limites_max_y(Limites l) { return ((StLimites*)l)->max_y; }
 
 void destruir_limites(Limites l) {
     if (l) free(l);
+}
+
+void limites_expandir_ponto(Limites l, double x, double y) {
+    StLimites *box = (StLimites*) l;
+    if (!box) return;
+
+    if (x < box->min_x) box->min_x = x;
+    if (x > box->max_x) box->max_x = x;
+    if (y < box->min_y) box->min_y = y;
+    if (y > box->max_y) box->max_y = y;
+}
+
+void limites_expandir_segmentos(Limites l, Lista segmentos) {
+    StLimites *box = (StLimites*) l;
+    if (!box || !segmentos) return;
+
+    Posic p = getFirst(segmentos);
+    while (p) {
+        void *s = get(segmentos, p);
+        
+        // Testa o ponto inicial do segmento
+        double x1 = get_segmento_x1(s);
+        double y1 = get_segmento_y1(s);
+        limites_expandir_ponto(l, x1, y1);
+
+        // Testa o ponto final do segmento
+        double x2 = get_segmento_x2(s);
+        double y2 = get_segmento_y2(s);
+        limites_expandir_ponto(l, x2, y2);
+
+        p = getNext(segmentos, p);
+    }
 }

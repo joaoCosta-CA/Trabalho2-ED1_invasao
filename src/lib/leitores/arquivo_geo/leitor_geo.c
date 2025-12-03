@@ -99,6 +99,7 @@ static void tratar_circulo(char *params, Lista l, int *max_id) {
 }
 
 static void tratar_estilo_texto(char *params, Lista l, int *max_id) {
+    (void) max_id;
     char familia[64];
     char peso[16];
     double tamanho;

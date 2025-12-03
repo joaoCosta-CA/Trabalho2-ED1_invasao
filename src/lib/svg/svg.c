@@ -36,14 +36,11 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
         return;
     }
 
-    // =========================================================
-    // FASE 1: CÁLCULO DOS LIMITES TOTAIS (Expandir a Câmera)
-    // =========================================================
-    
+    // 1. CÁLCULO DA VIEWBOX (Expandir a Câmera para incluir TUDO)
     double min_x = 0, min_y = 0, max_x = 1000, max_y = 1000;
     int inicializado = 0; 
 
-    // 1.1 Limites das Formas (O básico)
+    // 1.1 Limites das Formas
     if (formas && length(formas) > 0) {
         Limites box = calcular_limites_mundo(formas);
         min_x = get_limites_min_x(box);
@@ -66,12 +63,11 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
                 min_x = x1; max_x = x1; min_y = y1; max_y = y1;
                 inicializado = 1;
             }
-
-            if (x1 < min_x) min_x = x1;
+            if (x1 < min_x) min_x = x1; 
             if (x1 > max_x) max_x = x1;
             if (y1 < min_y) min_y = y1;
             if (y1 > max_y) max_y = y1;
-            if (x2 < min_x) min_x = x2;
+            if (x2 < min_x) min_x = x2; 
             if (x2 > max_x) max_x = x2;
             if (y2 < min_y) min_y = y2; 
             if (y2 > max_y) max_y = y2;
@@ -92,20 +88,16 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
                 min_x = bx; max_x = bx; min_y = by; max_y = by;
                 inicializado = 1;
             }
-
             if (bx < min_x) min_x = bx;
             if (bx > max_x) max_x = bx;
-            if (by < min_y) min_y = by;
+            if (by < min_y) min_y = by; 
             if (by > max_y) max_y = by;
 
             p = getNext(pontos_bombas, p);
         }
     }
 
-    // =========================================================
-    // FASE 2: ESCRITA DO ARQUIVO
-    // =========================================================
-
+    // Margem e Header
     double margem = 50.0;
     double vb_x = min_x - margem;
     double vb_y = min_y - margem;
@@ -119,7 +111,7 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
     char font_weight[20]  = "normal";
     double font_size      = 12.0;
 
-    // 2.1 Desenha Formas
+    // 2. CAMADA 1: FORMAS
     if (formas) {
         Posic p = getFirst(formas);
         while (p) {
@@ -150,7 +142,7 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
         }
     }
 
-    // 2.2 Desenha Anteparos
+    // 3. CAMADA 2: ANTEPAROS
     if (anteparos) {
         fprintf(svg, "\t\n");
         Posic p = getFirst(anteparos);
@@ -161,9 +153,15 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
             p = getNext(anteparos, p);
         }
     }
-    if (poligono) {
+
+    // 4. CAMADA 3: POLÍGONO DE VISIBILIDADE
+    if (poligono && length(poligono) > 0) {
         fprintf(svg, "\t\n");
+
+        fprintf(svg, "\t<path d=\"");
+        
         Posic p = getFirst(poligono);
+        int primeiro = 1;
         while (p) {
             void *s = get(poligono, p);
             double x1 = get_segmento_x1(s);
@@ -171,32 +169,45 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
             double x2 = get_segmento_x2(s);
             double y2 = get_segmento_y2(s);
 
-            // --- INÍCIO DO FILTRO VISUAL ---
-            int eh_linha_fantasma = 0;
+            if (primeiro) {
+                fprintf(svg, "M %.2f %.2f L %.2f %.2f", x1, y1, x2, y2);
+                primeiro = 0;
+            } else {
+                fprintf(svg, " L %.2f %.2f", x2, y2);
+            }
+            p = getNext(poligono, p);
+        }
+        // Fecha o caminho (Z) e define cor (sem borda aqui)
+        fprintf(svg, " Z\" fill=\"red\" fill-opacity=\"0.3\" stroke=\"none\" />\n");
 
-            // Verifica se este segmento é o "Raio Zero" de ALGUMA das bombas
+        p = getFirst(poligono);
+        while (p) {
+            void *s = get(poligono, p);
+            double x1 = get_segmento_x1(s); double y1 = get_segmento_y1(s);
+            double x2 = get_segmento_x2(s); double y2 = get_segmento_y2(s);
+
+            // Filtro da Linha Fantasma (Igual ao anterior)
+            int eh_linha_fantasma = 0;
             if (pontos_bombas) {
                 Posic pb = getFirst(pontos_bombas);
                 while (pb) {
                     double *pt = (double*) get(pontos_bombas, pb);
-                    double bx = pt[0];
-                    double by = pt[1];
+                    double bx = pt[0]; double by = pt[1];
 
-                    int horiz = fabs(y1 - y2) < 0.001;
-                    int altura = fabs(y1 - by) < 0.001;
-                    int direita = (x1 > bx + 0.1) || (x2 > bx + 0.1);
-
-                    if (horiz && altura && direita) {
-                        eh_linha_fantasma = 1;
-                        break; // Já achamos, não precisa testar outras bombas
+                    if (fabs(y1 - y2) < 0.1 && fabs(y1 - by) < 0.1) {
+                        if (x1 > bx + 0.1 || x2 > bx + 0.1) {
+                            eh_linha_fantasma = 1;
+                            break; 
+                        }
                     }
-
                     pb = getNext(pontos_bombas, pb);
                 }
             }
             
+            // Só desenha a borda se NÃO for a linha fantasma
             if (!eh_linha_fantasma) {
-                fprintf(svg, "\t<line x1=\"%.2f\" y1=\"%.2f\" x2=\"%.2f\" y2=\"%.2f\" stroke=\"red\" stroke-width=\"4\" opacity=\"0.5\" />\n",
+                fprintf(svg, "\t<line x1=\"%.2f\" y1=\"%.2f\" x2=\"%.2f\" y2=\"%.2f\" "
+                             "stroke=\"red\" stroke-width=\"4\" stroke-opacity=\"0.8\" stroke-linecap=\"round\" />\n",
                         x1, y1, x2, y2);
             }
             
@@ -204,7 +215,7 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
         }
     }
 
-    // 2.4 Desenha Bombas
+    // 5. CAMADA 4: BOMBAS
     if (pontos_bombas) {
         fprintf(svg, "\t\n");
         Posic p = getFirst(pontos_bombas);
@@ -240,10 +251,9 @@ static void escrever_retangulo(FILE *svg, void *dados) {
     double h = retangulo_get_altura(dados);
     const char *corb = retangulo_get_corb(dados);
     const char *corp = retangulo_get_corp(dados);
-    double y_svg = y - h;
 
     fprintf(svg, "\t<rect x=\"%.2f\" y=\"%.2f\" width=\"%.2f\" height=\"%.2f\" stroke=\"%s\" fill=\"%s\" stroke-width=\"1\" />\n",
-            x, y_svg, w, h, corb, corp);
+            x, y, w, h, corb, corp);
 }
 
 static void escrever_linha(FILE *svg, void *dados) {

@@ -20,16 +20,17 @@
 
 // Protótipos das funções auxiliares
 static void tratar_a(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, int *id_seg);
-static Lista obter_poligono_explosao(double x, double y, Lista formas, Lista anteparos, int *id_counter, char tipo_ord, int cutoff);
+static Lista obter_poligono_explosao(double x, double y, Lista formas, Lista anteparos, char tipo_ord, int cutoff);
 static void tratar_d(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros, Lista pontos_bombas, char tipo_ord, int cutoff);
 static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros, Lista pontos_bombas, char tipo_ord, int cutoff);
 static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, int *id_global, Lista registros, Lista pontos_bombas, char tipo_ord, int cutoff);
-static void remover_segmento_da_lista(Lista l, Segmento s);
 static void processar_destruicao(Lista formas, Lista poligono_visivel, FILE *txt);
 static int forma_foi_atingida(Forma f, Lista poligono);
 static void acumular_desenho(Lista acumulador, Lista poligono_atual);
 static void extrair_nome_base(const char *path, char *dest);
 static void destroy_segmento_void(void *p);
+static int anteparo_foi_atingido(Segmento s, Lista poligono);
+static void processar_efeito_em_anteparos(Lista anteparos, Lista poligono, FILE *txt, char tipo_efeito, char* cor_pintura);
 
 void processar_qry(const char *path_qry, const char *output_dir, const char *nome_base_geo, Lista lista_formas, char tipo_ord, int cutoff) {
     FILE *qry = fopen(path_qry, "r");
@@ -159,89 +160,47 @@ static void tratar_a(char *params, Lista lista_formas, Lista lista_anteparos, FI
 /* =========================================================
    STUB DO COMANDO 'd'
    ========================================================= */
-static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, const char *output_dir, Lista registros_visuais, Lista pontos_bombas, char tipo_ord, int cutoff) {
+static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, 
+                     const char *output_dir, Lista registros_visuais, Lista pontos_bombas, 
+                     char tipo_ord, int cutoff) {
     double x, y;
     char sfx[100];
     
-    // ID temporário para as paredes
-    int id_temp = 90000; 
-
     sscanf(params, "%lf %lf %s", &x, &y, sfx);
-    
-    // Move a bomba para evitar alinhamentos perfeitos com vértices
-    double x_calc = x + 0.00001;
-    double y_calc = y + 0.00001;
-
     fprintf(txt, "\n[*] Comando 'd': Bomba em (%.2f, %.2f) Sfx: %s\n", x, y, sfx);
 
-    Limites box = calcular_limites_mundo(lista_formas);
-    
-    double min_x = get_limites_min_x(box) - 50.0;
-    double max_x = get_limites_max_x(box) + 50.0;
-    double min_y = get_limites_min_y(box) - 50.0;
-    double max_y = get_limites_max_y(box) + 50.0;
-    
-    destruir_limites(box); 
-
-    // 2. Insere as 4 Paredes na lista de anteparos
-    Segmento p1 = create_segmento(id_temp++, min_x, min_y, max_x, min_y);
-    Segmento p2 = create_segmento(id_temp++, max_x, min_y, max_x, max_y);
-    Segmento p3 = create_segmento(id_temp++, max_x, max_y, min_x, max_y);
-    Segmento p4 = create_segmento(id_temp++, min_x, max_y, min_x, min_y);
-
-    insert(lista_anteparos, p1);
-    insert(lista_anteparos, p2);
-    insert(lista_anteparos, p3);
-    insert(lista_anteparos, p4);
-
-    fprintf(txt, "  (Paredes do mundo inseridas: %.1f, %.1f a %.1f, %.1f)\n", min_x, min_y, max_x, max_y);
-
+    // 1. Guarda ponto da bomba para o SVG final
     double *pt = malloc(2 * sizeof(double));
-    pt[0] = x;
-    pt[1] = y;
+    pt[0] = x; pt[1] = y;
     insert(pontos_bombas, pt);
 
-    // 3. EXECUTA O ALGORITMO DE VISIBILIDADE
-    // Usa as coordenadas perturbadas (x_calc, y_calc) para estabilidade numérica
-    Lista poligono_luz = calcular_visibilidade(x_calc, y_calc, lista_anteparos, tipo_ord, cutoff);
+    Lista poligono = obter_poligono_explosao(x, y, lista_formas, lista_anteparos, tipo_ord, cutoff);
 
-    acumular_desenho(registros_visuais, poligono_luz);
+    // Acumula para o SVG final
+    acumular_desenho(registros_visuais, poligono);
     
-    fprintf(txt, "  (Região de visibilidade calculada: %d arestas)\n", length(poligono_luz));
+    fprintf(txt, "  (Região de visibilidade calculada: %d arestas)\n", length(poligono));
 
-    // 4. Verifica e Remove formas atingidas (Implemente sua colisão aqui)
-    processar_destruicao(lista_formas, poligono_luz, txt);
+    // 3. APLICAÇÃO DOS EFEITOS
+    processar_destruicao(lista_formas, poligono, txt);
+    processar_efeito_em_anteparos(lista_anteparos, poligono, txt, 'd', NULL);
 
-    // 5. Gera SVG de Debug
+    // 4. GERA SVG DE DEBUG
     if (strcmp(sfx, "-") != 0) {
         Lista temp_bomba = createList();
         insert(temp_bomba, pt);
         char nome_arq_debug[1024];
         
-        // Salva no diretório correto recebido da main
-        if (output_dir)
-            sprintf(nome_arq_debug, "%s/bomba_%s.svg", output_dir, sfx);
-        else
-            sprintf(nome_arq_debug, "bomba_%s.svg", sfx);
+        if (output_dir) sprintf(nome_arq_debug, "%s/bomba_%s.svg", output_dir, sfx);
+        else sprintf(nome_arq_debug, "bomba_%s.svg", sfx);
         
-        gerar_svg(lista_formas, lista_anteparos, poligono_luz, temp_bomba, nome_arq_debug);
+        // Corrigido: passa 'lista_formas', 'lista_anteparos' e 'poligono'
+        gerar_svg(lista_formas, lista_anteparos, poligono, temp_bomba, nome_arq_debug);
 
         killList(temp_bomba, NULL);
     }
 
-    // 6. LIMPEZA
-    // Remove as paredes da lista para não poluir a próxima bomba
-    remover_segmento_da_lista(lista_anteparos, p1);
-    remover_segmento_da_lista(lista_anteparos, p2);
-    remover_segmento_da_lista(lista_anteparos, p3);
-    remover_segmento_da_lista(lista_anteparos, p4);
-    
-    // Libera a memória das paredes
-    destroy_segmento(p1); destroy_segmento(p2);
-    destroy_segmento(p3); destroy_segmento(p4);
-
-    // Libera a memória do polígono de visibilidade
-    killList(poligono_luz, destroy_segmento_void);
+    killList(poligono, destroy_segmento_void);
 }
 
 /*=================================================
@@ -255,16 +214,13 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
     sscanf(params, "%lf %lf %lf %lf %s", &x, &y, &dx, &dy, sfx);
     fprintf(txt, "\n[*] Comando 'cln': Clonar em (%.2f, %.2f) Off(%.2f, %.2f)\n", x, y, dx, dy);
 
-    double x_calc = x + 0.00001;
-    double y_calc = y + 0.00001;
-
     double *pt = malloc(2 * sizeof(double));
     pt[0] = x;
     pt[1] = y;
     insert(pontos_bombas, pt);
 
     // 1. Calcula a área atingida
-    Lista poligono = obter_poligono_explosao(x_calc, y_calc, formas, anteparos, id_global, tipo_ord, cutoff);
+    Lista poligono = obter_poligono_explosao(x, y, formas, anteparos, tipo_ord, cutoff);
 
     acumular_desenho(registros_visuais, poligono);
 
@@ -314,13 +270,9 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
 static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros_visuais, Lista pontos_bombas, char tipo_ord, int cutoff) {
     double x, y;
     char cor[100], sfx[100];
-    int id_dummy = 80000;
 
     sscanf(params, "%lf %lf %s %s", &x, &y, cor, sfx);
     fprintf(txt, "\n[*] Comando 'p': Pintar em (%.2f, %.2f) cor: %s\n", x, y, cor);
-
-    double x_calc = x + 0.00001;
-    double y_calc = y + 0.00001;
 
     double *pt = malloc(2 * sizeof(double));
     pt[0] = x;
@@ -328,7 +280,7 @@ static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, con
     insert(pontos_bombas, pt);
 
     // 1. Calcula a área atingida
-    Lista poligono = obter_poligono_explosao(x_calc, y_calc, formas, anteparos, &id_dummy, tipo_ord, cutoff);
+    Lista poligono = obter_poligono_explosao(x, y, formas, anteparos, tipo_ord, cutoff);
 
     acumular_desenho(registros_visuais, poligono);
 
@@ -370,17 +322,6 @@ static void extrair_nome_base(const char *path, char *dest) {
     strcpy(dest, base);
     char *dot = strrchr(dest, '.');
     if (dot) *dot = '\0';
-}
-
-static void remover_segmento_da_lista(Lista l, Segmento s) {
-    Posic p = getFirst(l);
-    while (p) {
-        if (get(l, p) == s) {
-            removePosic(l, p);
-            return;
-        }
-        p = getNext(l, p);
-    }
 }
 
 static int forma_foi_atingida(Forma f, Lista poligono) {
@@ -435,41 +376,15 @@ static int forma_foi_atingida(Forma f, Lista poligono) {
     return 0;
 }
 
-static Lista obter_poligono_explosao(double x, double y, Lista formas, Lista anteparos, int *id_counter, char tipo_ord, int cutoff) {
-    // 1. Calcula Limites
+static Lista obter_poligono_explosao(double x, double y, Lista formas, Lista anteparos, char tipo_ord, int cutoff) {
+
     Limites box = calcular_limites_mundo(formas);
-    double min_x = get_limites_min_x(box) - 50.0;
-    double max_x = get_limites_max_x(box) + 50.0;
-    double min_y = get_limites_min_y(box) - 50.0;
-    double max_y = get_limites_max_y(box) + 50.0;
+    limites_expandir_ponto(box, x, y);
+    limites_expandir_segmentos(box, anteparos);
+
+    Lista poligono = calcular_visibilidade(x + 0.00001, y + 0.00001, anteparos, box, tipo_ord, cutoff);
+
     destruir_limites(box);
-
-    // 2. Cria Paredes
-    Segmento p1 = create_segmento((*id_counter)++, min_x, min_y, max_x, min_y);
-    Segmento p2 = create_segmento((*id_counter)++, max_x, min_y, max_x, max_y);
-    Segmento p3 = create_segmento((*id_counter)++, max_x, max_y, min_x, max_y);
-    Segmento p4 = create_segmento((*id_counter)++, min_x, max_y, min_x, min_y);
-
-    insert(anteparos, p1); insert(anteparos, p2);
-    insert(anteparos, p3); insert(anteparos, p4);
-
-    // 3. Roda Algoritmo (com perturbação)
-    Lista poligono = calcular_visibilidade(x + 0.00001, y + 0.00001, anteparos, tipo_ord, cutoff);
-
-    // 4. Remove Paredes
-    // Nota: Dependendo da sua lista, remover pelo ponteiro pode ser lento ou exigir função específica.
-    // Se sua 'remove_segmento_da_lista' já existe (usada no tratar_d), use-a.
-    // Caso contrário, implemente um loop simples de remoção.
-    
-    // Assumindo que você tem a função helper que usamos no tratar_d:
-    remover_segmento_da_lista(anteparos, p1);
-    remover_segmento_da_lista(anteparos, p2);
-    remover_segmento_da_lista(anteparos, p3);
-    remover_segmento_da_lista(anteparos, p4);
-
-    destroy_segmento(p1); destroy_segmento(p2);
-    destroy_segmento(p3); destroy_segmento(p4);
-
     return poligono;
 }
 
@@ -510,4 +425,42 @@ static void acumular_desenho(Lista acumulador, Lista poligono_atual) {
 
 static void destroy_segmento_void(void *p) {
     if (p) destroy_segmento((Segmento)p);
+}
+
+
+static int anteparo_foi_atingido(Segmento s, Lista poligono) {
+    // Estratégia Simples: Testar o Ponto Médio do anteparo
+    double x1 = get_segmento_x1(s);
+    double y1 = get_segmento_y1(s);
+    double x2 = get_segmento_x2(s);
+    double y2 = get_segmento_y2(s);
+    
+    double mid_x = (x1 + x2) / 2.0;
+    double mid_y = (y1 + y2) / 2.0;
+
+    return ponto_dentro_poligono(mid_x, mid_y, poligono);
+}
+
+static void processar_efeito_em_anteparos(Lista anteparos, Lista poligono, FILE *txt, char tipo_efeito, char* cor_pintura) {
+    (void)cor_pintura;
+    Posic p = getFirst(anteparos);
+    
+    while (p) {
+        Segmento s = get(anteparos, p);
+        Posic p_next = getNext(anteparos, p);
+        
+        if (anteparo_foi_atingido(s, poligono)) {
+            int id = get_segmento_id(s);
+            
+            if (tipo_efeito == 'd') {
+                fprintf(txt, "  -> Anteparo ID %d destruído (Deixa de bloquear).\n", id);
+                removePosic(anteparos, p);
+                destroy_segmento(s);
+            }
+            else if (tipo_efeito == 'p') {
+                 fprintf(txt, "  -> Anteparo ID %d atingido pela tinta.\n", id);
+            }
+        }
+        p = p_next;
+    }
 }

@@ -11,6 +11,12 @@ typedef void* Limites;
  */
 Limites calcular_limites_mundo(Lista formas);
 
+/* Expande os limites para incluir um ponto (x,y) específico (ex: a bomba) */
+void limites_expandir_ponto(Limites l, double x, double y);
+
+/* Expande os limites para incluir todos os segmentos de uma lista */
+void limites_expandir_segmentos(Limites l, Lista segmentos);
+
 /* Getters para acessar os dados */
 double get_limites_min_x(Limites l);
 double get_limites_min_y(Limites l);

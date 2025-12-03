@@ -74,9 +74,6 @@ int comparar_vertices(const void *a, const void *b) {
         return (v1->angulo < v2->angulo) ? -1 : 1;
     }
 
-    // 2. CRÍTICO: TIPO
-    // Se os ângulos são iguais, processamos REMOÇÃO (Fim=1) antes de INSERÇÃO (Inicio=0).
-    // Queremos que Fim venha ANTES.
     if (v1->tipo != v2->tipo) {
     // TIPO_INICIO (0) deve ser menor que TIPO_FIM (1)
         return (v1->tipo == TIPO_INICIO) ? -1 : 1; 
@@ -188,6 +185,7 @@ Vertice* preparar_vertices_ordenados(double cx, double cy, Lista lista_segs, int
 
     return vetor;
 }
+
 void destroy_vertice(Vertice v) {
     if (v == NULL) return;
     
@@ -271,7 +269,7 @@ int comparar_segmentos_arvore(const void* a, const void* b) {
     
     if (pontos_iguais(s2x1, s2y1, s1x2, s1y2)) {
         double o = orientacao(BOMBA_X, BOMBA_Y, s2x2, s2y2, s1x1, s1y1);
-        return (o > 0) ? 1 : -1;
+        return (o > 0) ? -1 : 1;
     }
 
     // --- 2. ESTRATÉGIA DO PONTO MÉDIO ---
@@ -325,111 +323,150 @@ static void obter_ponto_interseccao(double bx, double by, Vertice v, void* seg, 
     calcular_interseccao(bx, by, vx, vy, sx1, sy1, sx2, sy2, out_x, out_y);
 }
 
-Lista calcular_visibilidade(double bx, double by, Lista anteparos, char tipo_ord, int cutoff) {
+/* ... includes anteriores ... */
+#include "geometria.h" // Necessário para calcular_interseccao
+
+/* ... funções auxiliares (adicionar_aresta, obter_ponto) mantidas ... */
+
+/* =========================================================
+ * O ALGORITMO PRINCIPAL (ATUALIZADO)
+ * ========================================================= */
+/* =========================================================
+ * O ALGORITMO PRINCIPAL (COM GESTÃO DE PAREDES E EIXO ZERO)
+ * ========================================================= */
+Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_mundo, char tipo_ord, int cutoff) {
     
-    // Configura o contexto geométrico (para o comparador da árvore funcionar)
+    // 1. CONFIGURA CONTEXTO
     set_contexto_bomba(bx, by);
 
-    // Prepara os Eventos (Extrai vértices e ordena angularmente)
+    // 2. CRIA PAREDES DO MUNDO (Usa o parâmetro box_mundo aqui!)
+    // Recupera os valores da caixa para fechar o mundo
+    double min_x = get_limites_min_x(box_mundo) - 50.0;
+    double max_x = get_limites_max_x(box_mundo) + 50.0;
+    double min_y = get_limites_min_y(box_mundo) - 50.0;
+    double max_y = get_limites_max_y(box_mundo) + 50.0;
+
+    // ID temporário seguro
+    int id_temp = 99000;
+
+    // Cria os 4 segmentos
+    Segmento p1 = create_segmento(id_temp++, min_x, min_y, max_x, min_y);
+    Segmento p2 = create_segmento(id_temp++, max_x, min_y, max_x, max_y);
+    Segmento p3 = create_segmento(id_temp++, max_x, max_y, min_x, max_y);
+    Segmento p4 = create_segmento(id_temp++, min_x, max_y, min_x, min_y);
+
+    // Insere e guarda posição para remoção rápida (O(1))
+    Posic no_p1 = insert(anteparos, p1);
+    Posic no_p2 = insert(anteparos, p2);
+    Posic no_p3 = insert(anteparos, p3);
+    Posic no_p4 = insert(anteparos, p4);
+
+    // 3. PREPARAÇÃO (Vértices e Árvore)
     int qtd_eventos = 0;
     Vertice *eventos = preparar_vertices_ordenados(bx, by, anteparos, &qtd_eventos, tipo_ord, cutoff);
 
-    // Inicializa Estruturas
     Lista poligono_visivel = createList();
     Arvore ativos = tree_create(comparar_segmentos_arvore);
     
+    // 4. PRÉ-PROCESSAMENTO DO EIXO ZERO (Biombo Inicial)
     void* biombo_atual = NULL;
-    double ponto_ant_x = bx;
-    double ponto_ant_y = by; 
+    double menor_dist_sq = -1.0;
 
-    // Loop de Varredura (Sweep Line) 
+    Posic p_ant = getFirst(anteparos);
+    while(p_ant) {
+        void* s = get(anteparos, p_ant);
+        double sx1 = get_segmento_x1(s); double sy1 = get_segmento_y1(s);
+        double sx2 = get_segmento_x2(s); double sy2 = get_segmento_y2(s);
+
+        // Verifica se corta o raio Y = by para X > bx
+        if ((sy1 > by && sy2 <= by) || (sy2 > by && sy1 <= by)) {
+            double t = (by - sy1) / (sy2 - sy1);
+            double x_int = sx1 + t * (sx2 - sx1);
+
+            if (x_int > bx) { 
+                double d = dist_sq(bx, by, x_int, by);
+                if (menor_dist_sq < 0 || d < menor_dist_sq) {
+                    menor_dist_sq = d;
+                    biombo_atual = s;
+                }
+                tree_insert(ativos, s); // Já inicia na árvore
+            }
+        }
+        p_ant = getNext(anteparos, p_ant);
+    }
+
+    // Define ponto inicial do desenho
+    double ponto_ant_x, ponto_ant_y;
+    if (biombo_atual) {
+        double dummy_y;
+        calcular_interseccao(bx, by, bx+1000, by, 
+                             get_segmento_x1(biombo_atual), get_segmento_y1(biombo_atual),
+                             get_segmento_x2(biombo_atual), get_segmento_y2(biombo_atual),
+                             &ponto_ant_x, &dummy_y);
+        ponto_ant_y = by;
+    } else {
+        ponto_ant_x = bx; ponto_ant_y = by;
+    }
+
+    // 5. LOOP DE VARREDURA (Sweep Line)
     for (int i = 0; i < qtd_eventos; i++) {
         Vertice v = eventos[i];
         void* seg_v = get_vertice_segmento(v);
-        int tipo = get_vertice_tipo(v); // 0=INICIO, 1=FIM
-
-        // Recupera coordenadas do vértice atual
+        int tipo = get_vertice_tipo(v); 
         double vx = get_vertice_x(v);
         double vy = get_vertice_y(v);
 
         if (tipo == TIPO_INICIO) {
-            
-            // Insere na árvore de ativos
             tree_insert(ativos, seg_v);
-
-            // Verifica quem é o mais próximo AGORA
             void* seg_mais_proximo = tree_find_min(ativos);
 
-            // Se o novo segmento passou a ser o mais próximo (bloqueou o biombo anterior)
             if (seg_mais_proximo == seg_v) {
-                if (biombo_atual != NULL) {
-                    // O raio bate no biombo antigo até este ângulo. Calculamos onde.
+                if (biombo_atual != NULL && biombo_atual != seg_v) {
                     double ix, iy;
                     obter_ponto_interseccao(bx, by, v, biombo_atual, &ix, &iy);
-                    
-                    // Desenha aresta do ponto anterior até a intersecção no biombo antigo
-                    // E depois conecta ao início do novo biombo (o vértice v)
                     adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, ix, iy);
                     adicionar_aresta_visivel(poligono_visivel, ix, iy, vx, vy);
-                } else {
-                    // Não havia biombo (estava vendo o infinito/borda), agora vê este vértice
-                    // (Lógica depende se vc usa Bounding Box infinito ou não)
+                } else if (biombo_atual == NULL) {
                     adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, vx, vy);
                 }
-                
-                // Atualiza estado
                 biombo_atual = seg_v;
-                ponto_ant_x = vx;
-                ponto_ant_y = vy;
+                ponto_ant_x = vx; ponto_ant_y = vy;
             }
         } 
-        else {
-            
-            // Se o segmento que está acabando ERA o biombo
+        else { // TIPO_FIM
             if (seg_v == biombo_atual) {
-                // Remove ele primeiro para descobrir quem está atrás
                 tree_remove(ativos, seg_v);
-                
-                // Quem assume o posto?
                 void* proximo_biombo = tree_find_min(ativos);
                 
                 if (proximo_biombo != NULL) {
-                    // O raio passava pelo vértice final (v) e agora bate no próximo biombo lá atrás
                     double ix, iy;
                     obter_ponto_interseccao(bx, by, v, proximo_biombo, &ix, &iy);
-                    
-                    // Aresta do ponto anterior até o vértice final
                     adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, vx, vy);
-                    // Aresta do vértice final até a projeção no biombo de trás
                     adicionar_aresta_visivel(poligono_visivel, vx, vy, ix, iy);
-                    
-                    ponto_ant_x = ix;
-                    ponto_ant_y = iy;
+                    ponto_ant_x = ix; ponto_ant_y = iy;
                 } else {
-                    // Ficou vazio (vê o infinito/borda)
                     adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, vx, vy);
-                    ponto_ant_x = vx;
-                    ponto_ant_y = vy;
+                    ponto_ant_x = vx; ponto_ant_y = vy;
                 }
-                
                 biombo_atual = proximo_biombo;
             } else {
-                // Era um segmento que estava escondido atrás do biombo. Só remove.
                 tree_remove(ativos, seg_v);
             }
         }
-        // void* min = tree_find_min(ativos);
-        // int id_min = min ? get_segmento_id(min) : -1;
-        // printf("[ANG %.2f] Evento ID %d (%s). Biombo Atual: %d\n", 
-        //        get_vertice_angulo(v) * 180 / M_PI,
-        //        get_segmento_id(seg_v),
-        //        tipo == TIPO_INICIO ? "INICIO" : "FIM",
-        //        id_min);
     }
 
-    // Limpeza
+    // 6. LIMPEZA INTERNA
     tree_destroy(ativos, NULL);
     destruir_vetor_vertices(eventos, qtd_eventos);
+
+    // 7. REMOVE PAREDES DO MUNDO (Limpa a sujeira que criou)
+    removePosic(anteparos, no_p1);
+    removePosic(anteparos, no_p2);
+    removePosic(anteparos, no_p3);
+    removePosic(anteparos, no_p4);
+
+    destroy_segmento(p1); destroy_segmento(p2);
+    destroy_segmento(p3); destroy_segmento(p4);
 
     return poligono_visivel;
 }

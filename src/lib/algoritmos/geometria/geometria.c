@@ -23,21 +23,16 @@ bool tem_interseccao(double ax, double ay, double bx, double by,
         ((cda > 0 && cdb < 0) || (cda < 0 && cdb > 0))) {
         return true;
     }
-    
-    // Casos de colinearidade não são o foco principal aqui para 'tem_interseccao' 
-    // simples do raio, mas em implementações robustas devem ser tratados.
     return false; 
 }
 
 void calcular_interseccao(double ax, double ay, double bx, double by, 
                           double cx, double cy, double dx, double dy,
                           double *x_int, double *y_int) {
-    // Reta 1: a1*x + b1*y = c1
     double a1 = by - ay;
     double b1 = ax - bx;
     double c1 = a1 * ax + b1 * ay;
  
-    // Reta 2: a2*x + b2*y = c2
     double a2 = dy - cy;
     double b2 = cx - dx;
     double c2 = a2 * cx + b2 * cy;

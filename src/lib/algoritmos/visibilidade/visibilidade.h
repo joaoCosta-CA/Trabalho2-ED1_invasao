@@ -2,6 +2,7 @@
 #define VISIBILIDADE_H
 
 #include "lista.h"
+#include "limites.h" 
 
 /* Tipo Opaco */
 typedef void* Vertice;
@@ -23,10 +24,11 @@ Vertice* preparar_vertices_ordenados(double centro_x, double centro_y,
                                      char tipo_ord, int cutoff);
 
 /*
- * Executa o Algoritmo de Varredura (Sweep Line).
- * Retorna uma Lista de Segmentos que formam o polígono de visibilidade.
+ * Calcula a visibilidade.
+ * Agora recebe 'box_mundo' para criar suas próprias paredes internas temporárias.
  */
-Lista calcular_visibilidade(double x, double y, Lista anteparos, char tipo_ord, int cutoff);
+Lista calcular_visibilidade(double x, double y, Lista anteparos, 
+                            Limites box_mundo, char tipo_ord, int cutoff);
 
 /* Getters */
 double get_vertice_x(Vertice v);

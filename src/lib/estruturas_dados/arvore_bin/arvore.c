@@ -121,22 +121,7 @@ static void freeNodes(Node* node, void (*freeItem)(void*)) {
     free(node);
 }
 
-static void printInOrder(Node* node, void (*printItem)(void*)) {
-    if (node == NULL) return;
-
-    // 1. Visita a sub-árvore esquerda
-    printInOrder(node->left, printItem);
-
-    // 2. Processa (imprime) o nó atual
-    if (printItem) {
-        printItem(node->item);
-    }
-
-    // 3. Visita a sub-árvore direita
-    printInOrder(node->right, printItem);
-}
 /* --- Funções de Remoção Recursiva --- */
-
 static Node* minValueNode(Node* node) {
     Node* current = node;
     while (current->left != NULL)
