@@ -223,12 +223,11 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
 /* --- Implementações Específicas --- */
 
 static void escrever_circulo(FILE *svg, void *dados) {
-    /* Recupera os valores usando os getters do módulo circulo */
     double x = circulo_get_x(dados);
     double y = circulo_get_y(dados);
     double r = circulo_get_raio(dados);
-    const char *corb = circulo_get_corb(dados); // stroke
-    const char *corp = circulo_get_corp(dados); // fill
+    const char *corb = circulo_get_corb(dados);
+    const char *corp = circulo_get_corp(dados);
 
     fprintf(svg, "\t<circle cx=\"%.2f\" cy=\"%.2f\" r=\"%.2f\" stroke=\"%s\" fill=\"%s\" stroke-width=\"1\" />\n",
             x, y, r, corb, corp);
@@ -241,10 +240,10 @@ static void escrever_retangulo(FILE *svg, void *dados) {
     double h = retangulo_get_altura(dados);
     const char *corb = retangulo_get_corb(dados);
     const char *corp = retangulo_get_corp(dados);
+    double y_svg = y - h;
 
-    // ajustar o Y aqui: y_svg = y_lido - altura.
     fprintf(svg, "\t<rect x=\"%.2f\" y=\"%.2f\" width=\"%.2f\" height=\"%.2f\" stroke=\"%s\" fill=\"%s\" stroke-width=\"1\" />\n",
-            x, y, w, h, corb, corp);
+            x, y_svg, w, h, corb, corp);
 }
 
 static void escrever_linha(FILE *svg, void *dados) {
@@ -266,7 +265,6 @@ static void escrever_texto(FILE *svg, void *dados, const char *family, const cha
     const char* corb = texto_get_corb(dados);
     const char* corp = texto_get_corp(dados);
 
-    // Converte âncora do projeto ('i', 'm', 'f') para SVG
     const char *svg_anchor = "start";
     if (ancora == 'm') svg_anchor = "middle";
     else if (ancora == 'f') svg_anchor = "end";

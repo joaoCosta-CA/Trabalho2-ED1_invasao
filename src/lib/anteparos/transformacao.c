@@ -7,7 +7,6 @@
 #include "retangulo.h"
 #include "linha.h"
 #include "texto.h"
-// Includes das formas específicas (circulo.h, retangulo.h, etc...)
 
 /* * Transforma uma forma geométrica em uma lista de segmentos (anteparos).
  * flag_circulo: 'h' ou 'v' (para círculos)
@@ -17,13 +16,9 @@ Lista transformar_em_anteparos(Forma f, char flag_circulo, int *id_seg_counter) 
     Lista segmentos = createList();
     void *dados = get_dados_forma(f);
     ShapeType tipo = get_tipo_forma(f);
-    
-    // ID da forma original para o relatório TXT
-    // int id_original = ... (pegue usando o getter específico)
 
     switch(tipo) {
         case CIRCULO: {
-            // [cite: 264] Círculo vira segmento no diâmetro
             double x = circulo_get_x(dados);
             double y = circulo_get_y(dados);
             double r = circulo_get_raio(dados);
@@ -69,24 +64,23 @@ Lista transformar_em_anteparos(Forma f, char flag_circulo, int *id_seg_counter) 
         }
 
         case TEXTO: {
-            // [cite: 268-278] Texto vira segmento baseado no tamanho da string
             double x = texto_get_x(dados);
             double y = texto_get_y(dados);
             char ancora = texto_get_ancora(dados);
             const char* conteudo = texto_get_conteudo(dados);
             
             double len = strlen(conteudo);
-            double comp_linha = 10.0 * len; // [cite: 279]
+            double comp_linha = 10.0 * len;
             
             double x1, x2;
             
-            if (ancora == 'i') { // Início [cite: 274]
+            if (ancora == 'i') {
                 x1 = x;
                 x2 = x + comp_linha;
-            } else if (ancora == 'f') { // Fim [cite: 276]
+            } else if (ancora == 'f') {
                 x1 = x - comp_linha;
                 x2 = x;
-            } else { // Meio ('m') [cite: 278]
+            } else { // Meio ('m')
                 x1 = x - comp_linha / 2.0;
                 x2 = x + comp_linha / 2.0;
             }

@@ -2,7 +2,6 @@
 #include "segmento.h"
 #include <math.h>
 
-/* Baseado no PDF (Pag 5) */
 double orientacao(double ax, double ay, double bx, double by, double cx, double cy) {
     return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
 }
@@ -20,7 +19,6 @@ bool tem_interseccao(double ax, double ay, double bx, double by,
     double cda = orientacao(cx, cy, dx, dy, ax, ay);
     double cdb = orientacao(cx, cy, dx, dy, bx, by);
 
-    // Se sinais opostos, produto é negativo
     if (((abc > 0 && abd < 0) || (abc < 0 && abd > 0)) &&
         ((cda > 0 && cdb < 0) || (cda < 0 && cdb > 0))) {
         return true;
@@ -50,7 +48,7 @@ void calcular_interseccao(double ax, double ay, double bx, double by,
         *x_int = (b2 * c1 - b1 * c2) / determinant;
         *y_int = (a1 * c2 - a2 * c1) / determinant;
     } else {
-        // Retas paralelas (não deve acontecer no contexto do raio x segmento)
+        // Retas paralelas
         *x_int = 0; *y_int = 0;
     }
 }
@@ -66,16 +64,7 @@ bool ponto_dentro_poligono(double px, double py, Lista poligono) {
         double x2 = get_segmento_x2(seg);
         double y2 = get_segmento_y2(seg);
 
-        /*
-         * ALGORITMO DE RAY CASTING
-         * Imagina uma linha horizontal saindo do ponto P para a direita.
-         * Contamos quantas vezes essa linha cruza as arestas do polígono.
-         * Se cruzar um número ÍMPAR de vezes -> Está Dentro.
-         * Se cruzar um número PAR de vezes -> Está Fora.
-         */
-
         // 1. Verifica se a coordenada Y do ponto está dentro do intervalo Y do segmento
-        // A condição ((y1 > py) != (y2 > py)) garante que uma ponta está acima e outra abaixo
         if (((y1 > py) != (y2 > py))) {
             
             // 2. Calcula a coordenada X onde a linha horizontal cruza o segmento
@@ -83,7 +72,7 @@ bool ponto_dentro_poligono(double px, double py, Lista poligono) {
 
             // 3. Verifica se o cruzamento acontece à direita do ponto P
             if (px < x_interseccao) {
-                inside = !inside; // Inverte o estado (Par <-> Ímpar)
+                inside = !inside;
             }
         }
 

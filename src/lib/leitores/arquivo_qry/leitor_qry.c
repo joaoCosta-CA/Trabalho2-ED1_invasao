@@ -90,9 +90,6 @@ void processar_qry(const char *path_qry, const char *output_dir, const char *nom
     
     printf("--> Gerando SVG Final: %s\n", nome_final_svg);
     
-    // Aqui usamos 'registros_visuais' como o argumento de polígono para desenhar tudo
-    // Passamos NULL no anteparo pois no final talvez não queiramos ver as paredes pretas, 
-    // ou passamos lista_anteparos se quiser ver o que sobrou de parede.
     gerar_svg(lista_formas, lista_anteparos, registros_visuais, pontos_bombas, nome_final_svg);
 
     // --- LIMPEZA ---
@@ -121,10 +118,6 @@ static void tratar_a(char *params, Lista lista_formas, Lista lista_anteparos, FI
     if (lidos == 3) flag = flag_buf[0];
 
     fprintf(txt, "\n[*] Comando 'a': Transformando IDs [%d, %d] em anteparos (%c)\n", i, j, flag);
-
-    // Percorrer a lista de formas
-    // CUIDADO: Vamos remover elementos enquanto percorremos.
-    // O jeito seguro é sempre pegar o 'next' antes de remover o atual.
     
     Posic p = getFirst(lista_formas);
     while (p) {
@@ -170,12 +163,12 @@ static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FI
     double x, y;
     char sfx[100];
     
-    // ID temporário para as paredes (alto para não colidir com IDs do geo)
+    // ID temporário para as paredes
     int id_temp = 90000; 
 
     sscanf(params, "%lf %lf %s", &x, &y, sfx);
     
-    // Move a bomba um milionésimo para evitar alinhamentos perfeitos com vértices
+    // Move a bomba para evitar alinhamentos perfeitos com vértices
     double x_calc = x + 0.00001;
     double y_calc = y + 0.00001;
 
@@ -227,9 +220,9 @@ static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FI
         
         // Salva no diretório correto recebido da main
         if (output_dir)
-            sprintf(nome_arq_debug, "%s/debug_bomba_%s.svg", output_dir, sfx);
+            sprintf(nome_arq_debug, "%s/bomba_%s.svg", output_dir, sfx);
         else
-            sprintf(nome_arq_debug, "debug_bomba_%s.svg", sfx);
+            sprintf(nome_arq_debug, "bomba_%s.svg", sfx);
         
         gerar_svg(lista_formas, lista_anteparos, poligono_luz, temp_bomba, nome_arq_debug);
 
@@ -275,9 +268,7 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
 
     acumular_desenho(registros_visuais, poligono);
 
-    // 2. Lista temporária para guardar os clones (CRUCIAL!)
-    // Se inserirmos direto na lista 'formas' enquanto percorremos ela,
-    // podemos clonar o clone infinitamente.
+    // 2. Lista temporária para guardar os clones
     Lista novos_clones = createList();
 
     Posic p = getFirst(formas);
@@ -303,13 +294,13 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
     }
     killList(novos_clones, NULL); // Destrói apenas a estrutura da lista temp
 
-    // 4. SVG de Debug
+    // 4. SVG
     if (strcmp(sfx, "-") != 0) {
         Lista temp_bomba = createList();
         insert(temp_bomba, pt);
         char path[1024];
-        if (out_dir) sprintf(path, "%s/debug_clone_%s.svg", out_dir, sfx);
-        else sprintf(path, "debug_clone_%s.svg", sfx);
+        if (out_dir) sprintf(path, "%s/clonagem_%s.svg", out_dir, sfx);
+        else sprintf(path, "clonagem_%s.svg", sfx);
         
         gerar_svg(formas, anteparos, poligono, temp_bomba, path);
     }
@@ -357,8 +348,8 @@ static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, con
         Lista temp_bomba = createList();
         insert(temp_bomba, pt);
         char path[1024];
-        if (out_dir) sprintf(path, "%s/debug_pintura_%s.svg", out_dir, sfx);
-        else sprintf(path, "debug_pintura_%s.svg", sfx);
+        if (out_dir) sprintf(path, "%s/pintura_%s.svg", out_dir, sfx);
+        else sprintf(path, "pintura_%s.svg", sfx);
         
         gerar_svg(formas, anteparos, poligono, temp_bomba, path);
     }

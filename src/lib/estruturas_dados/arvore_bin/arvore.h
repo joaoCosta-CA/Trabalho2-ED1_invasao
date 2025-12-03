@@ -29,7 +29,6 @@ void* tree_find_max(Arvore t);
 /* Destrói a árvore e limpa a memória dos nós */
 void tree_destroy(Arvore t, void (*freeItem)(void*));
 
-/* Debug: Imprime a árvore (opcional, útil para testes) */
-void tree_print(Arvore t, void (*printItem)(void*));
+
 
 #endif

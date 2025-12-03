@@ -143,7 +143,7 @@ static Node* minValueNode(Node* node) {
         current = current->left;
     return current;
 }
-/* Reimplementação Segura da Remoção */
+
 static Node* deleteNodeSafe(Node* root, void* item, Comparador cmp, void** item_removido) {
     if (!root) return root;
 
@@ -255,17 +255,5 @@ void tree_destroy(Arvore t, void (*freeItem)(void*)) {
     if (tree) {
         freeNodes(tree->root, freeItem);
         free(tree);
-    }
-}
-
-void tree_print(Arvore t, void (*printItem)(void*)) {
-    TreeStruct *tree = (TreeStruct*) t;
-    
-    if (tree != NULL && tree->root != NULL) {
-        printf("[ ");
-        printInOrder(tree->root, printItem);
-        printf("]\n");
-    } else {
-        printf("[ Arvore Vazia ]\n");
     }
 }

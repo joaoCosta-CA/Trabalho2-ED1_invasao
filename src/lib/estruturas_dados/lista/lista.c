@@ -46,7 +46,7 @@ Posic insert(Lista l, Item item) {
 }
 
 Item get(Lista l, Posic p) {
-    StList *list = (StList *) l; // Cast apenas para validação, se necessário
+    StList *list = (StList *) l;
 
     if(!list) return NULL;
 
@@ -64,7 +64,7 @@ Posic getFirst(Lista l) {
 }
 
 Posic getNext(Lista l, Posic p) {
-    (void) l; // Cast apenas para validação, se necessário
+    (void) l;
 
     Node *node = (Node *) p;
     if (!node) return NULL;
@@ -89,12 +89,11 @@ void killList(Lista l, void (*freeItem)(void*)) {
     while (current != NULL) {
         next_node = current->next;
         
-        // Se o usuário passou uma função para liberar o item, chama ela
         if (freeItem != NULL && current->item != NULL) {
             freeItem(current->item);
         }
         
-        free(current); // Libera o nó da lista
+        free(current);
         current = next_node;
     }
     free(list); // Libera a estrutura da lista

@@ -13,13 +13,12 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-/* A definição da struct fica ESCONDIDA aqui */
 typedef struct {
     double x, y;
     double angulo;
     double distancia;
-    int tipo;          // 0=Inicio, 1=Fim
-    void *segmento;    // Ponteiro para o segmento original
+    int tipo;         
+    void *segmento;    
 } VerticeStruct;
 
 /* Variáveis estáticas */
@@ -83,7 +82,7 @@ int comparar_vertices(const void *a, const void *b) {
         return (v1->tipo == TIPO_INICIO) ? -1 : 1; 
     }
 
-    // 3. Distância (Opcional)
+    // 3. Distância
     // Se ambos são Inicio ou ambos são Fim, processa o mais perto primeiro?
     if (fabs(v1->distancia - v2->distancia) > 1e-9) {
         return (v1->distancia < v2->distancia) ? -1 : 1;
@@ -126,15 +125,8 @@ Vertice* preparar_vertices_ordenados(double cx, double cy, Lista lista_segs, int
         double d1 = dist_sq(cx, cy, x1, y1);
         double d2 = dist_sq(cx, cy, x2, y2);
 
-        /* * DETECÇÃO DE CRUZAMENTO DO EIXO ZERO 
-         * Se a diferença angular for maior que PI (180 graus), significa que
-         * o menor caminho cruza o ângulo 0/360.
-         */
+        /* DETECÇÃO DE CRUZAMENTO DO EIXO ZERO */
         if (fabs(ang1 - ang2) > M_PI) {
-            // Precisamos calcular onde corta o eixo X positivo (y = cy, x > cx)
-            // Intersecção da reta do segmento com a reta y = cy.
-            // Fórmula da reta: P = P1 + t(P2-P1). Queremos P.y = cy.
-            // cy = y1 + t(y2 - y1)  -->  t = (cy - y1) / (y2 - y1)
             
             double t = (cy - y1) / (y2 - y1);
             double x_cut = x1 + t * (x2 - x1);
@@ -250,8 +242,6 @@ static double distancia_interseccao_raio(void *seg_void, double dest_x, double d
 
 /*
  * Comparador Baseado em Ponto Médio (Evita problemas nos vértices)
- * Retorna -1 se S1 < S2 (S1 mais perto)
- * Retorna  1 se S1 > S2 (S1 mais longe)
  */
 int comparar_segmentos_arvore(const void* a, const void* b) {
     void* s1 = (void*)a;
@@ -284,7 +274,7 @@ int comparar_segmentos_arvore(const void* a, const void* b) {
         return (o > 0) ? 1 : -1;
     }
 
-    // --- 2. ESTRATÉGIA DO PONTO MÉDIO (Para casos gerais) ---
+    // --- 2. ESTRATÉGIA DO PONTO MÉDIO ---
     double mid1_x = (s1x1 + s1x2) / 2.0;
     double mid1_y = (s1y1 + s1y2) / 2.0;
     
@@ -337,30 +327,22 @@ static void obter_ponto_interseccao(double bx, double by, Vertice v, void* seg, 
 
 Lista calcular_visibilidade(double bx, double by, Lista anteparos, char tipo_ord, int cutoff) {
     
-    // 1. Configura o contexto geométrico (para o comparador da árvore funcionar)
+    // Configura o contexto geométrico (para o comparador da árvore funcionar)
     set_contexto_bomba(bx, by);
 
-    // 2. Prepara os Eventos (Extrai vértices e ordena angularmente)
+    // Prepara os Eventos (Extrai vértices e ordena angularmente)
     int qtd_eventos = 0;
-    // O PDF pede MergeSort ('m') e cutoff 10 por padrão, mas pode ser configurável
     Vertice *eventos = preparar_vertices_ordenados(bx, by, anteparos, &qtd_eventos, tipo_ord, cutoff);
 
-    // 3. Inicializa Estruturas
+    // Inicializa Estruturas
     Lista poligono_visivel = createList();
     Arvore ativos = tree_create(comparar_segmentos_arvore);
     
-    // O "Biombo" é o segmento que está bloqueando a visão atualmente
     void* biombo_atual = NULL;
-    double ponto_ant_x = bx; // Ponto anterior do polígono (começa no angulo 0 ou no primeiro vertice)
-    double ponto_ant_y = by; // (Simplificação: idealmente calculamos interseção com eixo X positivo)
+    double ponto_ant_x = bx;
+    double ponto_ant_y = by; 
 
-    /*
-     * PRÉ-PROCESSAMENTO (Opcional mas recomendado pelo PDF [302]):
-     * Verificar quais segmentos já começam interceptando o eixo X positivo (angulo 0).
-     * Como simplificação inicial, vamos assumir que a varredura começa no primeiro vértice ordenado.
-     */
-
-    // 4. Loop de Varredura (Sweep Line) 
+    // Loop de Varredura (Sweep Line) 
     for (int i = 0; i < qtd_eventos; i++) {
         Vertice v = eventos[i];
         void* seg_v = get_vertice_segmento(v);
@@ -436,20 +418,16 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos, char tipo_ord
                 tree_remove(ativos, seg_v);
             }
         }
-        void* min = tree_find_min(ativos);
-        int id_min = min ? get_segmento_id(min) : -1;
-        printf("[ANG %.2f] Evento ID %d (%s). Biombo Atual: %d\n", 
-               get_vertice_angulo(v) * 180 / M_PI, // Converte para graus para facilitar leitura
-               get_segmento_id(seg_v),
-               tipo == TIPO_INICIO ? "INICIO" : "FIM",
-               id_min);
+        // void* min = tree_find_min(ativos);
+        // int id_min = min ? get_segmento_id(min) : -1;
+        // printf("[ANG %.2f] Evento ID %d (%s). Biombo Atual: %d\n", 
+        //        get_vertice_angulo(v) * 180 / M_PI,
+        //        get_segmento_id(seg_v),
+        //        tipo == TIPO_INICIO ? "INICIO" : "FIM",
+        //        id_min);
     }
 
-    // 5. Fechamento do Polígono
-    // Conecta o último ponto ao inicial (ou trata o cruzamento do eixo 0 se necessário)
-    // adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, ...);
-
-    // 6. Limpeza
+    // Limpeza
     tree_destroy(ativos, NULL);
     destruir_vetor_vertices(eventos, qtd_eventos);
 
