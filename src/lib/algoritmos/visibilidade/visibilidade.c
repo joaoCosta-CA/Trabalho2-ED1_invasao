@@ -24,10 +24,15 @@ typedef struct {
 /* Variáveis estáticas */
 static double BOMBA_X;
 static double BOMBA_Y;
+static Vertice VERTICE_ATUAL;
 
 void set_contexto_bomba(double x, double y) {
     BOMBA_X = x;
     BOMBA_Y = y;
+}
+
+void set_vertice_atual(Vertice v) {
+    VERTICE_ATUAL = v;
 }
 
 /* --- Implementação dos Getters --- */
@@ -61,7 +66,7 @@ static Vertice criar_vertice_interno(double x, double y, double ang, double dist
 }
 
 static int pontos_iguais(double x1, double y1, double x2, double y2) {
-    return dist_sq(x1, y1, x2, y2) < 1e-7;
+    return dist_sq(x1, y1, x2, y2) < 1e-4;
 }
 
 /* Comparador para o Sort (agora faz cast para VerticeStruct) */
@@ -244,62 +249,45 @@ static double distancia_interseccao_raio(void *seg_void, double dest_x, double d
 int comparar_segmentos_arvore(const void* a, const void* b) {
     void* s1 = (void*)a;
     void* s2 = (void*)b;
-
+    
     if (s1 == s2) return 0;
 
+    // 1. Recupera o raio atual da varredura (Bomba -> VerticeAtual)
+    // Nota: Se o vértice atual for o próprio início de s1 ou s2, cuidado com precisão.
+    double vx = get_vertice_x(VERTICE_ATUAL);
+    double vy = get_vertice_y(VERTICE_ATUAL);
+
+    // Calcula a distância da Bomba até a intersecção deste raio com S1 e S2
+    double dist1 = distancia_interseccao_raio(s1, vx, vy);
+    double dist2 = distancia_interseccao_raio(s2, vx, vy);
+
+    // Se o raio não acertar o segmento (ex: erro de precisão ou segmento terminando), 
+    // tentamos usar o "Início" do próprio segmento como fallback, 
+    // pois segmentos ativos DEVEM ser interceptados pelo raio de varredura.
+    if (dist1 < 0) dist1 = dist_sq(BOMBA_X, BOMBA_Y, get_segmento_x1(s1), get_segmento_y1(s1));
+    if (dist2 < 0) dist2 = dist_sq(BOMBA_X, BOMBA_Y, get_segmento_x1(s2), get_segmento_y1(s2));
+
+    // 2. Comparação Direta de Distância
+    if (fabs(dist1 - dist2) > 1e-7) {
+        return (dist1 < dist2) ? -1 : 1; // Menor distância ganha (vem antes)
+    }
+
+    // 3. Empate (Vértices Compartilhados)
+    // Se as distâncias são iguais, usa a orientação do outro extremo para desempatar
+    // (Mesma lógica "Topológica" que passei antes)
     double s1x1 = get_segmento_x1(s1), s1y1 = get_segmento_y1(s1);
     double s1x2 = get_segmento_x2(s1), s1y2 = get_segmento_y2(s1);
     double s2x1 = get_segmento_x1(s2), s2y1 = get_segmento_y1(s2);
     double s2x2 = get_segmento_x2(s2), s2y2 = get_segmento_y2(s2);
 
-    // --- 1. CASO CRÍTICO: VÉRTICES COMPARTILHADOS (Elimina a Diagonal) ---
-    // Se S1 e S2 nascem no mesmo ponto (o canto do retângulo)
-    if (pontos_iguais(s1x1, s1y1, s2x1, s2y1)) {
-        // Usamos a orientação (determinante) do outro extremo para desempatar
-        // Se o fim de S2 está à esquerda de S1, S2 está na frente.
+    // Se S1 e S2 compartilham inicio (distâncias iguais)
+    if (dist_sq(s1x1, s1y1, s2x1, s2y1) < 1e-7) {
         double o = orientacao(BOMBA_X, BOMBA_Y, s1x2, s1y2, s2x2, s2y2);
         return (o > 0) ? -1 : 1; 
     }
-    
-    // Se um é continuação do outro (S1 começa onde S2 termina)
-    if (pontos_iguais(s1x1, s1y1, s2x2, s2y2)) {
-        double o = orientacao(BOMBA_X, BOMBA_Y, s1x2, s1y2, s2x1, s2y1);
-        return (o > 0) ? -1 : 1;
-    }
-    
-    if (pontos_iguais(s2x1, s2y1, s1x2, s1y2)) {
-        double o = orientacao(BOMBA_X, BOMBA_Y, s2x2, s2y2, s1x1, s1y1);
-        return (o > 0) ? -1 : 1;
-    }
 
-    // --- 2. ESTRATÉGIA DO PONTO MÉDIO ---
-    double mid1_x = (s1x1 + s1x2) / 2.0;
-    double mid1_y = (s1y1 + s1y2) / 2.0;
-    
-    double dist_s1 = dist_sq(BOMBA_X, BOMBA_Y, mid1_x, mid1_y);
-    double dist_s2_no_raio_s1 = distancia_interseccao_raio(s2, mid1_x, mid1_y);
-
-    if (dist_s2_no_raio_s1 >= 0) {
-        if (dist_s2_no_raio_s1 < dist_s1 - 1e-7) return 1;  // S2 ganha
-        if (dist_s2_no_raio_s1 > dist_s1 + 1e-7) return -1; // S1 ganha
-    }
-
-    // Prova real (Inverso)
-    double mid2_x = (s2x1 + s2x2) / 2.0;
-    double mid2_y = (s2y1 + s2y2) / 2.0;
-    
-    double dist_s2 = dist_sq(BOMBA_X, BOMBA_Y, mid2_x, mid2_y);
-    double dist_s1_no_raio_s2 = distancia_interseccao_raio(s1, mid2_x, mid2_y);
-
-    if (dist_s1_no_raio_s2 >= 0) {
-        if (dist_s1_no_raio_s2 < dist_s2 - 1e-7) return -1; // S1 ganha
-        if (dist_s1_no_raio_s2 > dist_s2 + 1e-7) return 1;  // S2 ganha
-    }
-
-    // Desempate por ID
-    int id1 = get_segmento_id(s1);
-    int id2 = get_segmento_id(s2);
-    return (id1 < id2) ? -1 : 1;
+    // Fallback ID
+    return (get_segmento_id(s1) < get_segmento_id(s2)) ? -1 : 1;
 }
 
 static void adicionar_aresta_visivel(Lista poligono, double x1, double y1, double x2, double y2) {
@@ -389,7 +377,6 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_m
                     menor_dist_sq = d;
                     biombo_atual = s;
                 }
-                tree_insert(ativos, s); // Já inicia na árvore
             }
         }
         p_ant = getNext(anteparos, p_ant);
@@ -411,6 +398,7 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_m
     // 5. LOOP DE VARREDURA (Sweep Line)
     for (int i = 0; i < qtd_eventos; i++) {
         Vertice v = eventos[i];
+        set_vertice_atual(v);
         void* seg_v = get_vertice_segmento(v);
         int tipo = get_vertice_tipo(v); 
         double vx = get_vertice_x(v);

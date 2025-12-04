@@ -165,6 +165,8 @@ static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FI
                      char tipo_ord, int cutoff) {
     double x, y;
     char sfx[100];
+    printf("--- COMANDO D ---\n");
+    printf("Anteparos antes da explosão: %d\n", length(lista_anteparos));
     
     sscanf(params, "%lf %lf %s", &x, &y, sfx);
     fprintf(txt, "\n[*] Comando 'd': Bomba em (%.2f, %.2f) Sfx: %s\n", x, y, sfx);
@@ -185,17 +187,19 @@ static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FI
     processar_destruicao(lista_formas, poligono, txt);
     processar_efeito_em_anteparos(lista_anteparos, poligono, txt, 'd', NULL);
 
+    printf("Anteparos DEPOIS da explosão: %d\n", length(lista_anteparos));
+
     // 4. GERA SVG DE DEBUG
     if (strcmp(sfx, "-") != 0) {
         Lista temp_bomba = createList();
         insert(temp_bomba, pt);
-        char nome_arq_debug[1024];
+        char nome_arq[1024];
         
-        if (output_dir) sprintf(nome_arq_debug, "%s/bomba_%s.svg", output_dir, sfx);
-        else sprintf(nome_arq_debug, "bomba_%s.svg", sfx);
+        if (output_dir) sprintf(nome_arq, "%s/bomba_%s.svg", output_dir, sfx);
+        else sprintf(nome_arq, "bomba_%s.svg", sfx);
         
         // Corrigido: passa 'lista_formas', 'lista_anteparos' e 'poligono'
-        gerar_svg(lista_formas, lista_anteparos, poligono, temp_bomba, nome_arq_debug);
+        gerar_svg(NULL, NULL, poligono, temp_bomba, nome_arq);
 
         killList(temp_bomba, NULL);
     }
@@ -258,7 +262,7 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
         if (out_dir) sprintf(path, "%s/clonagem_%s.svg", out_dir, sfx);
         else sprintf(path, "clonagem_%s.svg", sfx);
         
-        gerar_svg(formas, anteparos, poligono, temp_bomba, path);
+        gerar_svg(NULL, NULL, poligono, temp_bomba, path);
     }
     
     killList(poligono, destroy_segmento_void);
@@ -270,6 +274,8 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
 static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros_visuais, Lista pontos_bombas, char tipo_ord, int cutoff) {
     double x, y;
     char cor[100], sfx[100];
+    printf("--- COMANDO P ---\n");
+    printf("Anteparos no momento da pintura: %d\n", length(anteparos));
 
     sscanf(params, "%lf %lf %s %s", &x, &y, cor, sfx);
     fprintf(txt, "\n[*] Comando 'p': Pintar em (%.2f, %.2f) cor: %s\n", x, y, cor);
@@ -303,7 +309,7 @@ static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, con
         if (out_dir) sprintf(path, "%s/pintura_%s.svg", out_dir, sfx);
         else sprintf(path, "pintura_%s.svg", sfx);
         
-        gerar_svg(formas, anteparos, poligono, temp_bomba, path);
+        gerar_svg(NULL, NULL, poligono, temp_bomba, path);
     }
     
     // Limpeza do polígono
@@ -382,7 +388,10 @@ static Lista obter_poligono_explosao(double x, double y, Lista formas, Lista ant
     limites_expandir_ponto(box, x, y);
     limites_expandir_segmentos(box, anteparos);
 
-    Lista poligono = calcular_visibilidade(x + 0.00001, y + 0.00001, anteparos, box, tipo_ord, cutoff);
+    double bx = x + 0.00001;
+    double by = y + 0.00001;
+
+    Lista poligono = calcular_visibilidade(bx, by, anteparos, box, tipo_ord, cutoff);
 
     destruir_limites(box);
     return poligono;
