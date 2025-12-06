@@ -20,7 +20,11 @@ Arvore tree_create(Comparador cmp);
 
 void tree_insert(Arvore t, void* item);
 
-void* tree_remove(Arvore t, void* item);
+void* tree_remove(Arvore arvore, void* info);
+
+/* Numeric key functions (match reference implementation) */
+void tree_insert_with_key(Arvore* arvore, double key, void* info);
+int tree_remove_with_key(Arvore arvore, double key, void* data);
 
 void* tree_find_min(Arvore t);
 

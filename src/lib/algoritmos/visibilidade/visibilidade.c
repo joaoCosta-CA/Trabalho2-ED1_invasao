@@ -39,6 +39,7 @@ void set_vertice_atual(Vertice v) {
 double get_vertice_x(Vertice v) { return ((VerticeStruct*)v)->x; }
 double get_vertice_y(Vertice v) { return ((VerticeStruct*)v)->y; }
 double get_vertice_angulo(Vertice v) { return ((VerticeStruct*)v)->angulo; }
+double get_vertice_distancia(Vertice v) { return ((VerticeStruct*)v)->distancia; }
 void* get_vertice_segmento(Vertice v) { return ((VerticeStruct*)v)->segmento; }
 int get_vertice_tipo(Vertice v) { return ((VerticeStruct*)v)->tipo; }
 
@@ -468,58 +469,70 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_m
         ponto_ant_x = bx; ponto_ant_y = by;
     }
 
-    // 5. LOOP DE VARREDURA (Sweep Line)
-    for (int i = 0; i < qtd_eventos; i++) {
-        Vertice v = eventos[i];
-        set_vertice_atual(v);
+    // 5. VARREDURA ANGULAR - Using numeric keys like reference  
+    for (int idx = 0; idx < qtd_eventos; idx++) {
+        Vertice v = eventos[idx];
+        int tipo = get_vertice_tipo(v);
         void* seg_v = get_vertice_segmento(v);
-        int tipo = get_vertice_tipo(v); 
+        
         double vx = get_vertice_x(v);
         double vy = get_vertice_y(v);
-
+        double dist_key = get_vertice_distancia(v);
+        
         if (tipo == TIPO_INICIO) {
-            tree_insert(ativos, seg_v);
-            void* seg_mais_proximo = tree_find_min(ativos);
-
-            if (seg_mais_proximo == seg_v) {
-                if (!vertex_encoberto(bx, by, v, ativos, seg_v)) {
-                    if (biombo_atual != NULL && biombo_atual != seg_v) {
-                        double ix, iy;
-                        obter_ponto_interseccao(bx, by, v, biombo_atual, &ix, &iy);
-                        adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, ix, iy);
-                        adicionar_aresta_visivel(poligono_visivel, ix, iy, vx, vy);
-                    } else if (biombo_atual == NULL) {
-                        adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, vx, vy);
-                    }
-                    biombo_atual = seg_v;
-                    ponto_ant_x = vx; ponto_ant_y = vy;
-                }
-            }
-        } 
-        else { // TIPO_FIM
-            if (seg_v == biombo_atual) {
-                if (!vertex_encoberto(bx, by, v, ativos, seg_v)) {
-                    tree_remove(ativos, seg_v);
-                    void* proximo_biombo = tree_find_min(ativos);
+            tree_insert_with_key(&ativos, dist_key, seg_v);
+        } else {
+            tree_remove_with_key(ativos, dist_key, seg_v);
+        }
+        
+        // Check if there's an intersection blocking the view to this vertex
+        double min_t = 1.0;
+        int found_intersection = 0;
+        double int_x, int_y;
+        
+        // Iterate through all active segments
+        Posic p = tree_get_first(ativos);
+        while (p) {
+            void* seg_ativo = tree_get_value(ativos, p);
+            
+            if (seg_ativo) {
+                double ix, iy;
+                if (calcular_interseccao_raio_segmento(bx, by, vx, vy,
+                                                       get_segmento_x1(seg_ativo),
+                                                       get_segmento_y1(seg_ativo),
+                                                       get_segmento_x2(seg_ativo),
+                                                       get_segmento_y2(seg_ativo),
+                                                       &ix, &iy)) {
+                    // Calculate t parameter
+                    double dx = vx - bx;
+                    double dy = vy - by;
+                    double len_sq = dx*dx + dy*dy;
                     
-                    if (proximo_biombo != NULL) {
-                        double ix, iy;
-                        obter_ponto_interseccao(bx, by, v, proximo_biombo, &ix, &iy);
-                        adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, vx, vy);
-                        adicionar_aresta_visivel(poligono_visivel, vx, vy, ix, iy);
-                        ponto_ant_x = ix; ponto_ant_y = iy;
-                    } else {
-                        adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, vx, vy);
-                        ponto_ant_x = vx; ponto_ant_y = vy;
+                    if (len_sq > 1e-9) {
+                        double t_param = ((ix - bx)*dx + (iy - by)*dy) / len_sq;
+                        
+                        if (t_param > 1e-9 && t_param < min_t) {
+                            min_t = t_param;
+                            int_x = ix;
+                            int_y = iy;
+                            found_intersection = 1;
+                        }
                     }
-                    biombo_atual = proximo_biombo;
-                } else {
-                    tree_remove(ativos, seg_v);
-                    biombo_atual = NULL;
                 }
-            } else {
-                tree_remove(ativos, seg_v);
             }
+            
+            p = tree_get_next(ativos, p);
+        }
+        
+        // Add points following reference logic
+        if (found_intersection && min_t < 0.999999) {
+            adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, int_x, int_y);
+            ponto_ant_x = int_x;
+            ponto_ant_y = int_y;
+        } else {
+            adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, vx, vy);
+            ponto_ant_x = vx;
+            ponto_ant_y = vy;
         }
     }
 
