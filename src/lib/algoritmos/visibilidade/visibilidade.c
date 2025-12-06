@@ -291,6 +291,14 @@ int comparar_segmentos_arvore(const void* a, const void* b) {
 }
 
 static void adicionar_aresta_visivel(Lista poligono, double x1, double y1, double x2, double y2) {
+    const double epsilon = 1e-9;
+    double dx = x2 - x1;
+    double dy = y2 - y1;
+    
+    // Filter degenerate edges
+    if (fabs(dx) < epsilon && fabs(dy) < epsilon) {
+        return;
+    }
 
     static int id_gen = 90000; 
     insert(poligono, create_segmento(id_gen++, x1, y1, x2, y2));
@@ -307,8 +315,15 @@ static void obter_ponto_interseccao(double bx, double by, Vertice v, void* seg, 
     double sx2 = get_segmento_x2(seg);
     double sy2 = get_segmento_y2(seg);
 
-    // Calcula intersecção da Reta(Bomba, Vertice) com o Segmento
-    calcular_interseccao(bx, by, vx, vy, sx1, sy1, sx2, sy2, out_x, out_y);
+    if (!calcular_interseccao_raio_segmento(bx, by, vx, vy, sx1, sy1, sx2, sy2, out_x, out_y)) {
+        double d1 = dist_sq(vx, vy, sx1, sy1);
+        double d2 = dist_sq(vx, vy, sx2, sy2);
+        if (d1 < d2) {
+            *out_x = sx1; *out_y = sy1;
+        } else {
+            *out_x = sx2; *out_y = sy2;
+        }
+    }
 }
 
 /* ... includes anteriores ... */
@@ -322,6 +337,64 @@ static void obter_ponto_interseccao(double bx, double by, Vertice v, void* seg, 
 /* =========================================================
  * O ALGORITMO PRINCIPAL (COM GESTÃO DE PAREDES E EIXO ZERO)
  * ========================================================= */
+
+static int vertex_encoberto(double bx, double by, Vertice v, Arvore ativos, void* seg_v) {
+    if (!ativos) return 0;
+    
+    double vx = get_vertice_x(v);
+    double vy = get_vertice_y(v);
+    double dist_vertex = dist_sq(bx, by, vx, vy);
+    const double epsilon = 1e-6;
+    
+    Lista temp_list = createList();
+    if (!temp_list) return 0;
+    
+    Posic p = tree_get_first(ativos);
+    int count = 0;
+    const int MAX_COLLECT = 500;
+    
+    while (p && count < MAX_COLLECT) {
+        void* seg = tree_get_value(ativos, p);
+        if (seg) {
+            insert(temp_list, seg);
+            count++;
+        }
+        p = tree_get_next(ativos, p);
+    }
+    
+    int resultado = 0;
+    Posic lista_p = getFirst(temp_list);
+    
+    while (lista_p) {
+        void* seg_ativo = get(temp_list, lista_p);
+        
+        if (seg_ativo != seg_v) {
+            double ix, iy;
+            
+            if (calcular_interseccao_raio_segmento(bx, by, vx, vy,
+                                                    get_segmento_x1(seg_ativo),
+                                                    get_segmento_y1(seg_ativo),
+                                                    get_segmento_x2(seg_ativo),
+                                                    get_segmento_y2(seg_ativo),
+                                                    &ix, &iy)) {
+                double dist_intersection = dist_sq(bx, by, ix, iy);
+                
+                if (dist_intersection < dist_vertex - epsilon) {
+                    resultado = 1;
+                    break;
+                }
+            }
+        }
+        
+        lista_p = getNext(temp_list, lista_p);
+    }
+    
+    killList(temp_list, NULL);
+    
+    return resultado;
+}
+
+
 Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_mundo, char tipo_ord, int cutoff) {
     
     // 1. CONFIGURA CONTEXTO
@@ -409,34 +482,41 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_m
             void* seg_mais_proximo = tree_find_min(ativos);
 
             if (seg_mais_proximo == seg_v) {
-                if (biombo_atual != NULL && biombo_atual != seg_v) {
-                    double ix, iy;
-                    obter_ponto_interseccao(bx, by, v, biombo_atual, &ix, &iy);
-                    adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, ix, iy);
-                    adicionar_aresta_visivel(poligono_visivel, ix, iy, vx, vy);
-                } else if (biombo_atual == NULL) {
-                    adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, vx, vy);
+                if (!vertex_encoberto(bx, by, v, ativos, seg_v)) {
+                    if (biombo_atual != NULL && biombo_atual != seg_v) {
+                        double ix, iy;
+                        obter_ponto_interseccao(bx, by, v, biombo_atual, &ix, &iy);
+                        adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, ix, iy);
+                        adicionar_aresta_visivel(poligono_visivel, ix, iy, vx, vy);
+                    } else if (biombo_atual == NULL) {
+                        adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, vx, vy);
+                    }
+                    biombo_atual = seg_v;
+                    ponto_ant_x = vx; ponto_ant_y = vy;
                 }
-                biombo_atual = seg_v;
-                ponto_ant_x = vx; ponto_ant_y = vy;
             }
         } 
         else { // TIPO_FIM
             if (seg_v == biombo_atual) {
-                tree_remove(ativos, seg_v);
-                void* proximo_biombo = tree_find_min(ativos);
-                
-                if (proximo_biombo != NULL) {
-                    double ix, iy;
-                    obter_ponto_interseccao(bx, by, v, proximo_biombo, &ix, &iy);
-                    adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, vx, vy);
-                    adicionar_aresta_visivel(poligono_visivel, vx, vy, ix, iy);
-                    ponto_ant_x = ix; ponto_ant_y = iy;
+                if (!vertex_encoberto(bx, by, v, ativos, seg_v)) {
+                    tree_remove(ativos, seg_v);
+                    void* proximo_biombo = tree_find_min(ativos);
+                    
+                    if (proximo_biombo != NULL) {
+                        double ix, iy;
+                        obter_ponto_interseccao(bx, by, v, proximo_biombo, &ix, &iy);
+                        adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, vx, vy);
+                        adicionar_aresta_visivel(poligono_visivel, vx, vy, ix, iy);
+                        ponto_ant_x = ix; ponto_ant_y = iy;
+                    } else {
+                        adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, vx, vy);
+                        ponto_ant_x = vx; ponto_ant_y = vy;
+                    }
+                    biombo_atual = proximo_biombo;
                 } else {
-                    adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, vx, vy);
-                    ponto_ant_x = vx; ponto_ant_y = vy;
+                    tree_remove(ativos, seg_v);
+                    biombo_atual = NULL;
                 }
-                biombo_atual = proximo_biombo;
             } else {
                 tree_remove(ativos, seg_v);
             }

@@ -6,7 +6,8 @@ typedef struct node {
     void* item;
     struct node *left;
     struct node *right;
-    int height; // Altura do nó para cálculo de balanceamento
+    struct node *parent;
+    int height;
 } Node;
 
 typedef struct {
@@ -30,6 +31,7 @@ static Node* newNode(void* item) {
     node->item = item;
     node->left = NULL;
     node->right = NULL;
+    node->parent = NULL;
     node->height = 1;
     return node;
 }
@@ -233,6 +235,46 @@ void* tree_find_max(Arvore t) {
     return current->item;
 }
 
+Posic tree_get_first(Arvore t) {
+    TreeStruct *tree = (TreeStruct*) t;
+    if (!tree || !tree->root) return NULL;
+    
+    Node* current = tree->root;
+    while (current->left != NULL)
+        current = current->left;
+    
+    return (Posic)current;
+}
+
+Posic tree_get_next(Arvore t, Posic pos) {
+    (void)t;
+    if (!pos) return NULL;
+    
+    Node* node = (Node*)pos;
+    
+    if (node->right != NULL) {
+        node = node->right;
+        while (node->left != NULL)
+            node = node->left;
+        return (Posic)node;
+    }
+    
+    Node* parent = node->parent;
+    while (parent != NULL && node == parent->right) {
+        node = parent;
+        parent = parent->parent;
+    }
+    
+    return (Posic)parent;
+}
+
+void* tree_get_value(Arvore t, Posic pos) {
+    (void)t;
+    if (!pos) return NULL;
+    
+    Node* node = (Node*)pos;
+    return node->item;
+}
 
 
 void tree_destroy(Arvore t, void (*freeItem)(void*)) {

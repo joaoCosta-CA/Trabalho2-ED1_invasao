@@ -1,6 +1,7 @@
 #include "geometria.h"
 #include "segmento.h"
 #include <math.h>
+#include <stdbool.h>
 
 double orientacao(double ax, double ay, double bx, double by, double cx, double cy) {
     return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
@@ -46,6 +47,47 @@ void calcular_interseccao(double ax, double ay, double bx, double by,
         // Retas paralelas
         *x_int = 0; *y_int = 0;
     }
+}
+
+bool calcular_interseccao_raio_segmento(
+    double raio_x, double raio_y,
+    double dest_x, double dest_y,
+    double seg_x1, double seg_y1,
+    double seg_x2, double seg_y2,
+    double *x_int, double *y_int
+) {
+    calcular_interseccao(raio_x, raio_y, dest_x, dest_y, 
+                         seg_x1, seg_y1, seg_x2, seg_y2, 
+                         x_int, y_int);
+    
+    double seg_dx = seg_x2 - seg_x1;
+    double seg_dy = seg_y2 - seg_y1;
+    
+    double t;
+    if (fabs(seg_dx) > fabs(seg_dy)) {
+        t = (*x_int - seg_x1) / seg_dx;
+    } else if (fabs(seg_dy) > 1e-9) {
+        t = (*y_int - seg_y1) / seg_dy;
+    } else {
+        return false;
+    }
+    
+    const double epsilon = 1e-6;
+    if (t < -epsilon || t > 1.0 + epsilon) {
+        return false;
+    }
+    
+    double ray_dx = dest_x - raio_x;
+    double ray_dy = dest_y - raio_y;
+    double to_int_dx = *x_int - raio_x;
+    double to_int_dy = *y_int - raio_y;
+    
+    double dot = ray_dx * to_int_dx + ray_dy * to_int_dy;
+    if (dot < -epsilon) {
+        return false;
+    }
+    
+    return true;
 }
 
 bool ponto_dentro_poligono(double px, double py, Lista poligono) {

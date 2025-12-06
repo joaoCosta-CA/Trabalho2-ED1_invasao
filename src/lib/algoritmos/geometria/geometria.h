@@ -2,6 +2,8 @@
 #define GEOMETRIA_H
 
 #include <stdbool.h>
+
+#include <stdbool.h>
 #include "lista.h"
 
 /*
@@ -28,6 +30,16 @@ bool tem_interseccao(double ax, double ay, double bx, double by,
 void calcular_interseccao(double ax, double ay, double bx, double by, 
                           double cx, double cy, double dx, double dy,
                           double *x_int, double *y_int);
+
+bool calcular_interseccao_raio_segmento(
+    double raio_x, double raio_y,
+    double dest_x, double dest_y,
+    double seg_x1, double seg_y1,
+    double seg_x2, double seg_y2,
+    double *x_int, double *y_int
+);
+
+int ponto_dentro_retangulo(double px, double py, double x, double y, double w, double h);
 
 /*
  * Verifica se o ponto (px, py) está dentro do polígono definido pela lista de segmentos.
