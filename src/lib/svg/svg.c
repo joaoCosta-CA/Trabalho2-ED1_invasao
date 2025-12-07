@@ -97,6 +97,31 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
         }
     }
 
+    // 1.4 Expandir com os ANTEPAROS (para incluir clones!)
+    if (anteparos) {
+        Posic p = getFirst(anteparos);
+        while (p) {
+            void *s = get(anteparos, p);
+            double x1 = get_segmento_x1(s); double y1 = get_segmento_y1(s);
+            double x2 = get_segmento_x2(s); double y2 = get_segmento_y2(s);
+            
+            if (!inicializado) {
+                min_x = x1; max_x = x1; min_y = y1; max_y = y1;
+                inicializado = 1;
+            }
+            if (x1 < min_x) min_x = x1; 
+            if (x1 > max_x) max_x = x1;
+            if (y1 < min_y) min_y = y1;
+            if (y1 > max_y) max_y = y1;
+            if (x2 < min_x) min_x = x2; 
+            if (x2 > max_x) max_x = x2;
+            if (y2 < min_y) min_y = y2; 
+            if (y2 > max_y) max_y = y2;
+            
+            p = getNext(anteparos, p);
+        }
+    }
+
     // Margem e Header
     double margem = 50.0;
     double vb_x = min_x - margem;
@@ -207,7 +232,7 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
             // Só desenha a borda se NÃO for a linha fantasma
             if (!eh_linha_fantasma) {
                 fprintf(svg, "\t<line x1=\"%.2f\" y1=\"%.2f\" x2=\"%.2f\" y2=\"%.2f\" "
-                             "stroke=\"red\" stroke-width=\"4\" stroke-opacity=\"0.8\" stroke-linecap=\"round\" />\n",
+                             "stroke=\"red\" stroke-width=\"1\" stroke-opacity=\"0.4\" stroke-linecap=\"round\" />\n",
                         x1, y1, x2, y2);
             }
             

@@ -2,13 +2,12 @@
 #include <stdlib.h>
 #include "arvore.h"
 
+// Simple BST Node (no AVL balancing)
 typedef struct node {
     void* item;
     double key;          // Numeric key for ordering (used when cmp==NULL)
     struct node *left;
     struct node *right;
-    struct node *parent;
-    int height;
 } Node;
 
 typedef struct {
@@ -16,16 +15,7 @@ typedef struct {
     Comparador cmp;
 } TreeStruct;
 
-/* --- Funções Auxiliares Privadas --- */
-
-static int height(Node *N) {
-    if (N == NULL) return 0;
-    return N->height;
-}
-
-static int max(int a, int b) {
-    return (a > b) ? a : b;
-}
+/* --- BST Helper Functions (simplified) --- */
 
 static Node* newNode(void* item) {
     Node* node = (Node*)malloc(sizeof(Node));
@@ -33,8 +23,6 @@ static Node* newNode(void* item) {
     node->key = 0.0;     // Default key (not used if comparator exists)
     node->left = NULL;
     node->right = NULL;
-    node->parent = NULL;
-    node->height = 1;
     return node;
 }
 
@@ -44,69 +32,13 @@ static Node* newNodeWithKey(double key, void* item) {
     node->key = key;
     node->left = NULL;
     node->right = NULL;
-    node->parent = NULL;
-    node->height = 1;
     return node;
-}
-
-/* Rotação à Direita */
-static Node* rightRotate(Node *y) {
-    Node *x = y->left;
-    Node *T2 = x->right;
-
-    // Store y's parent
-    Node *y_parent = y->parent;
-
-    // Perform rotation
-    x->right = y;
-    y->left = T2;
-
-    // Update parent pointers
-    x->parent = y_parent;  // x takes y's position
-    y->parent = x;         // y becomes x's child
-    if (T2) T2->parent = y;  // T2 becomes y's child
-
-    // Update heights
-    y->height = max(height(y->left), height(y->right)) + 1;
-    x->height = max(height(x->left), height(x->right)) + 1;
-
-    return x;
-}
-
-/* Rotação à Esquerda */
-static Node* leftRotate(Node *x) {
-    Node *y = x->right;
-    Node *T2 = y->left;
-
-    // Store x's parent
-    Node *x_parent = x->parent;
-
-    // Perform rotation
-    y->left = x;
-    x->right = T2;
-
-    // Update parent pointers
-    y->parent = x_parent;  // y takes x's position
-    x->parent = y;         // x becomes y's child
-    if (T2) T2->parent = x;  // T2 becomes x's child
-
-    // Update heights
-    x->height = max(height(x->left), height(x->right)) + 1;
-    y->height = max(height(y->left), height(y->right)) + 1;
-
-    return y;
-}
-
-/* Obtém o fator de balanceamento */
-static int getBalance(Node *N) {
-    if (N == NULL) return 0;
-    return height(N->left) - height(N->right);
 }
 
 /* --- Funções de Inserção Recursiva --- */
 
+/* Simple BST Insert (no balancing) */
 static Node* insertNode(Node* node, void* item, Comparador cmp) {
-    /* 1. Inserção normal de BST */
     if (node == NULL)
         return newNode(item);
 
@@ -116,34 +48,7 @@ static Node* insertNode(Node* node, void* item, Comparador cmp) {
         node->left = insertNode(node->left, item, cmp);
     else if (comparison > 0)
         node->right = insertNode(node->right, item, cmp);
-    else
-        return node; // Duplicatas não permitidas (ou ignoradas)
-
-    /* 2. Atualiza altura */
-    node->height = 1 + max(height(node->left), height(node->right));
-
-    /* 3. Verifica balanceamento */
-    int balance = getBalance(node);
-
-    // Caso Esquerda-Esquerda
-    if (balance > 1 && cmp(item, node->left->item) < 0)
-        return rightRotate(node);
-
-    // Caso Direita-Direita
-    if (balance < -1 && cmp(item, node->right->item) > 0)
-        return leftRotate(node);
-
-    // Caso Esquerda-Direita
-    if (balance > 1 && cmp(item, node->left->item) > 0) {
-        node->left = leftRotate(node->left);
-        return rightRotate(node);
-    }
-
-    // Caso Direita-Esquerda
-    if (balance < -1 && cmp(item, node->right->item) < 0) {
-        node->right = rightRotate(node->right);
-        return leftRotate(node);
-    }
+    // else: duplicate, ignore
 
     return node;
 }
@@ -164,6 +69,7 @@ static Node* minValueNode(Node* node) {
     return current;
 }
 
+/* Simple BST Delete (no balancing) */
 static Node* deleteNodeSafe(Node* root, void* item, Comparador cmp, void** item_removido) {
     if (!root) return root;
 
@@ -174,51 +80,23 @@ static Node* deleteNodeSafe(Node* root, void* item, Comparador cmp, void** item_
     } else if (comparison > 0) {
         root->right = deleteNodeSafe(root->right, item, cmp, item_removido);
     } else {
-        // Achou o nó
+        // Found node to delete
         if (item_removido) *item_removido = root->item;
 
-        if (!root->left || !root->right) {
-            Node *temp = root->left ? root->left : root->right;
-            if (!temp) {
-                // Sem filhos
-                temp = root;
-                root = NULL;
-            } else {
-                // Um filho
-                *root = *temp;
-            }
-            free(temp);
-        } else {
-            // Dois filhos: pega o sucessor in-order (menor da direita)
-            Node* temp = minValueNode(root->right);
-            root->item = temp->item; // Copia apenas o dado
-            // Remove o sucessor
-            root->right = deleteNodeSafe(root->right, temp->item, cmp, NULL);
+        if (root->left == NULL) {
+            Node* temp = root->right;
+            free(root);
+            return temp;
+        } else if (root->right == NULL) {
+            Node* temp = root->left;
+            free(root);
+            return temp;
         }
-    }
 
-    if (root == NULL) return root;
-
-    // Atualiza Altura
-    root->height = 1 + max(height(root->left), height(root->right));
-
-    // Balanceia
-    int balance = getBalance(root);
-
-    if (balance > 1 && getBalance(root->left) >= 0)
-        return rightRotate(root);
-
-    if (balance > 1 && getBalance(root->left) < 0) {
-        root->left = leftRotate(root->left);
-        return rightRotate(root);
-    }
-
-    if (balance < -1 && getBalance(root->right) <= 0)
-        return leftRotate(root);
-
-    if (balance < -1 && getBalance(root->right) > 0) {
-        root->right = rightRotate(root->right);
-        return leftRotate(root);
+        // Two children: get inorder successor
+        Node* temp = minValueNode(root->right);
+        root->item = temp->item;
+        root->right = deleteNodeSafe(root->right, temp->item, cmp, NULL);
     }
 
     return root;
@@ -279,12 +157,31 @@ Posic tree_get_first(Arvore t) {
     return (Posic)current;
 }
 
-Posic tree_get_next(Arvore t, Posic pos) {
-    (void)t;
-    if (!pos) return NULL;
+/* Helper to build path from root to node (alternative to parent pointers) */
+static int find_path_to_node(Node* root, Node* target, Node** path, int* path_len) {
+    if (!root) return 0;
     
+    path[*path_len] = root;
+    (*path_len)++;
+    
+    if (root == target) return 1;
+    
+    if (find_path_to_node(root->left, target, path, path_len) ||
+        find_path_to_node(root->right, target, path, path_len)) {
+        return 1;
+    }
+    
+    (*path_len)--;
+    return 0;
+}
+
+Posic tree_get_next(Arvore t, Posic pos) {
+    if (!t || !pos) return NULL;
+    
+    TreeStruct *tree = (TreeStruct*)t;
     Node* node = (Node*)pos;
     
+    // If right subtree exists, return leftmost of right
     if (node->right != NULL) {
         node = node->right;
         while (node->left != NULL)
@@ -292,13 +189,22 @@ Posic tree_get_next(Arvore t, Posic pos) {
         return (Posic)node;
     }
     
-    Node* parent = node->parent;
-    while (parent != NULL && node == parent->right) {
-        node = parent;
-        parent = parent->parent;
+    // Need to go up - use path array (max depth ~100 should be enough)
+    Node* path[100];
+    int path_len = 0;
+    
+    if (!find_path_to_node(tree->root, node, path, &path_len)) {
+        return NULL;
     }
     
-    return (Posic)parent;
+    // Find first ancestor where node is in left subtree
+    for (int i = path_len - 2; i >= 0; i--) {
+        if (path[i]->left == path[i+1]) {
+            return (Posic)path[i];
+        }
+    }
+    
+    return NULL; // No successor
 }
 
 void* tree_get_value(Arvore t, Posic pos) {
@@ -322,53 +228,20 @@ void tree_destroy(Arvore t, void (*freeItem)(void*)) {
  * NUMERIC KEY FUNCTIONS - Match reference implementation
  * ======================================================================== */
 
-/* Insert with numeric key (no comparator needed) */
-static Node* insertNodeWithKey(Node* node, double key, void* item) {
-    /* 1. Normal BST insertion using numeric key */
-    if (node == NULL)
-        return newNodeWithKey(key, item);
-
-    if (key < node->key) {
-        node->left = insertNodeWithKey(node->left, key, item);
-        if (node->left) node->left->parent = node;
+// Simple BST insertion (iterative, like reference)
+static Node* insertNodeWithKey(Node* root, double key, void* item) {
+    Node** current = &root;
+    
+    while (*current != NULL) {
+        if (key < (*current)->key) {
+            current = &((*current)->left);
+        } else {
+            current = &((*current)->right);
+        }
     }
-    else if (key > node->key) {
-        node->right = insertNodeWithKey(node->right, key, item);
-        if (node->right) node->right->parent = node;
-    }
-    else {
-        // Equal keys - return node (no duplicates)
-        // Note: This differs from reference, but our remove uses data pointer for disambiguation anyway
-        return node;
-    }
-
-    /* 2. Update height */
-    node->height = 1 + max(height(node->left), height(node->right));
-
-    /* 3. Check balance */
-    int balance = getBalance(node);
-
-    // Left-Left
-    if (balance > 1 && key < node->left->key)
-        return rightRotate(node);
-
-    // Right-Right
-    if (balance < -1 && key > node->right->key)
-        return leftRotate(node);
-
-    // Left-Right
-    if (balance > 1 && key > node->left->key) {
-        node->left = leftRotate(node->left);
-        return rightRotate(node);
-    }
-
-    // Right-Left
-    if (balance < -1 && key < node->right->key) {
-        node->right = rightRotate(node->right);
-        return leftRotate(node);
-    }
-
-    return node;
+    
+    *current = newNodeWithKey(key, item);
+    return root;
 }
 
 /* Remove with numeric key + data pointer for disambiguation */
@@ -412,29 +285,7 @@ static Node* removeNodeWithKey(Node* root, double key, void* data, int* found) {
         }
     }
 
-    if (root == NULL)
-        return root;
-
-    root->height = 1 + max(height(root->left), height(root->right));
-
-    int balance = getBalance(root);
-
-    if (balance > 1 && getBalance(root->left) >= 0)
-        return rightRotate(root);
-
-    if (balance > 1 && getBalance(root->left) < 0) {
-        root->left = leftRotate(root->left);
-        return rightRotate(root);
-    }
-
-    if (balance < -1 && getBalance(root->right) <= 0)
-        return leftRotate(root);
-
-    if (balance < -1 && getBalance(root->right) > 0) {
-        root->right = rightRotate(root->right);
-        return leftRotate(root);
-    }
-
+    // No balancing needed - simple BST
     return root;
 }
 

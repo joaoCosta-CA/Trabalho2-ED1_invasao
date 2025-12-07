@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "leitor_qry.h"
 #include "forma.h"
@@ -90,6 +91,8 @@ void processar_qry(const char *path_qry, const char *output_dir, const char *nom
     sprintf(nome_final_svg, "%s/%s-%s.svg", output_dir, nome_base_geo, nome_qry_sem_ext);
     
     printf("--> Gerando SVG Final: %s\n", nome_final_svg);
+    printf("[DEBUG] registros_visuais tem %d segmentos\n", length(registros_visuais));
+    printf("[DEBUG] lista_anteparos tem %d anteparos\n", length(lista_anteparos));
     
     gerar_svg(lista_formas, lista_anteparos, registros_visuais, pontos_bombas, nome_final_svg);
 
@@ -217,20 +220,27 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
     
     sscanf(params, "%lf %lf %lf %lf %s", &x, &y, &dx, &dy, sfx);
     fprintf(txt, "\n[*] Comando 'cln': Clonar em (%.2f, %.2f) Off(%.2f, %.2f)\n", x, y, dx, dy);
-
+    
+    // Save bomb point for SVG
     double *pt = malloc(2 * sizeof(double));
     pt[0] = x;
     pt[1] = y;
     insert(pontos_bombas, pt);
+    
+    printf("[DEBUG CLN] ANTES cálculo polígono: %d anteparos\n", length(anteparos));
 
     // 1. Calcula a área atingida
     Lista poligono = obter_poligono_explosao(x, y, formas, anteparos, tipo_ord, cutoff);
+    
+    printf("[DEBUG CLN] DEPOIS cálculo polígono: %d anteparos, polígono tem %d segmentos\n", 
+           length(anteparos), length(poligono));
 
     acumular_desenho(registros_visuais, poligono);
 
     // 2. Lista temporária para guardar os clones
     Lista novos_clones = createList();
 
+    // 2.1 Clona FORMAS atingidas
     Posic p = getFirst(formas);
     while (p) {
         Forma f = get(formas, p);
@@ -239,20 +249,37 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
             Forma clone = forma_clonar(f, (*id_global)++, dx, dy);
             if (clone) {
                 insert(novos_clones, clone);
-                fprintf(txt, "  -> Clonado ID %d (Novo ID %d)\n", 
+                fprintf(txt, "  -> Clonado Forma ID %d (Novo ID %d)\n", 
                         get_forma_id_generico(f), get_forma_id_generico(clone));
             }
         }
         p = getNext(formas, p);
     }
 
-    // 3. Move os clones para a lista principal
+    // 2.2 Clona ANTEPAROS atingidos (usa mesma lógica do comando 'd')
+    double clone_params[3];
+    clone_params[0] = dx;
+    clone_params[1] = dy;
+    clone_params[2] = (double)(*id_global);
+    
+    int id_antes = *id_global;
+    processar_efeito_em_anteparos(anteparos, poligono, txt, 'c', (char*)clone_params);
+    *id_global = (int)clone_params[2];
+    
+    printf("[DEBUG CLN] DEPOIS clonagem: %d anteparos\n", length(anteparos));
+    
+    int total_clones = (*id_global - id_antes);
+    if (total_clones > 0) {
+        fprintf(txt, "  (Total: %d anteparo(s) clonado(s))\n", total_clones);
+    }
+
+    // 3. Move os clones de formas para a lista principal
     while(length(novos_clones) > 0) {
         Posic p_tmp = getFirst(novos_clones);
-        Forma c = removePosic(novos_clones, p_tmp); // Remove da temp
-        insert(formas, c); // Insere na principal
+        Forma c = removePosic(novos_clones, p_tmp);
+        insert(formas, c);
     }
-    killList(novos_clones, NULL); // Destrói apenas a estrutura da lista temp
+    killList(novos_clones, NULL);
 
     // 4. SVG
     if (strcmp(sfx, "-") != 0) {
@@ -384,7 +411,17 @@ static int forma_foi_atingida(Forma f, Lista poligono) {
 
 static Lista obter_poligono_explosao(double x, double y, Lista formas, Lista anteparos, char tipo_ord, int cutoff) {
 
-    Limites box = calcular_limites_mundo(formas);
+    // CRITICAL FIX: Only use anteparos for bbox!
+    // Start with VERY LARGE bbox to avoid bbox walls blocking vision
+    Lista lista_vazia = createList();
+    Limites box = calcular_limites_mundo(lista_vazia);
+    killList(lista_vazia, NULL);
+    
+    // Expand to very large area (-1000 to 2000) so bbox walls don't interfere 
+    limites_expandir_ponto(box, -1000, -1000);
+    limites_expandir_ponto(box, 2000, 2000);
+    
+    // Then expand with bomb and anteparos
     limites_expandir_ponto(box, x, y);
     limites_expandir_segmentos(box, anteparos);
 
@@ -438,21 +475,76 @@ static void destroy_segmento_void(void *p) {
 
 
 static int anteparo_foi_atingido(Segmento s, Lista poligono) {
-    // Estratégia Simples: Testar o Ponto Médio do anteparo
     double x1 = get_segmento_x1(s);
     double y1 = get_segmento_y1(s);
     double x2 = get_segmento_x2(s);
     double y2 = get_segmento_y2(s);
     
-    double mid_x = (x1 + x2) / 2.0;
-    double mid_y = (y1 + y2) / 2.0;
-
-    return ponto_dentro_poligono(mid_x, mid_y, poligono);
+    // Verifica se alguma ponta do anteparo está dentro do polígono
+    if (ponto_dentro_poligono(x1, y1, poligono) || 
+        ponto_dentro_poligono(x2, y2, poligono)) {
+        return 1;
+    }
+    
+    // Verifica se o anteparo intersecta ou TOCA qualquer aresta do polígono
+    Posic p = getFirst(poligono);
+    while (p) {
+        Segmento seg_poly = get(poligono, p);
+        double px1 = get_segmento_x1(seg_poly);
+        double py1 = get_segmento_y1(seg_poly);
+        double px2 = get_segmento_x2(seg_poly);
+        double py2 = get_segmento_y2(seg_poly);
+        
+        // Verifica interseção
+        if (tem_interseccao(x1, y1, x2, y2, px1, py1, px2, py2)) {
+            return 1;
+        }
+        
+        // NOVO: Verifica se ponta do anteparo está SOBRE a aresta do polígono
+        // (ray-casting não detecta pontos exatamente na borda)
+        double tol = 1.0;  // Tolerância de 1 pixel
+        
+        // Verifica se (x1,y1) está sobre o segmento (px1,py1)-(px2,py2)
+        double seg_len = sqrt((px2-px1)*(px2-px1) + (py2-py1)*(py2-py1));
+        if (seg_len > 0.001) {
+            // Distância perpendicular do ponto ao segmento
+            double dist1 = fabs((py2-py1)*x1 - (px2-px1)*y1 + px2*py1 - py2*px1) / seg_len;
+            // Verifica se está dentro do "retângulo" do segmento
+            double minx = (px1 < px2 ? px1 : px2) - tol;
+            double maxx = (px1 > px2 ? px1 : px2) + tol;
+            double miny = (py1 < py2 ? py1 : py2) - tol;
+            double maxy = (py1 > py2 ? py1 : py2) + tol;
+            
+            if (dist1 < tol && x1 >= minx && x1 <= maxx && y1 >= miny && y1 <= maxy) {
+                return 1;  // Ponta 1 do anteparo está sobre aresta do polígono
+            }
+            
+            // Verifica se (x2,y2) está sobre o segmento
+            double dist2 = fabs((py2-py1)*x2 - (px2-px1)*y2 + px2*py1 - py2*px1) / seg_len;
+            if (dist2 < tol && x2 >= minx && x2 <= maxx && y2 >= miny && y2 <= maxy) {
+                return 1;  // Ponta 2 do anteparo está sobre aresta do polígono
+            }
+        }
+        
+        p = getNext(poligono, p);
+    }
+    
+    return 0;
 }
 
-static void processar_efeito_em_anteparos(Lista anteparos, Lista poligono, FILE *txt, char tipo_efeito, char* cor_pintura) {
-    (void)cor_pintura;
+static void processar_efeito_em_anteparos(Lista anteparos, Lista poligono, FILE *txt, char tipo_efeito, char* param_extra) {
     Posic p = getFirst(anteparos);
+    
+    // Para clonagem, precisamos dos parâmetros de offset
+    double dx = 0, dy = 0;
+    int id_base = 90000;
+    
+    if (tipo_efeito == 'c' && param_extra) {
+        double *params = (double*)param_extra;
+        dx = params[0];
+        dy = params[1];
+        id_base = (int)params[2];
+    }
     
     while (p) {
         Segmento s = get(anteparos, p);
@@ -468,6 +560,26 @@ static void processar_efeito_em_anteparos(Lista anteparos, Lista poligono, FILE 
             }
             else if (tipo_efeito == 'p') {
                  fprintf(txt, "  -> Anteparo ID %d atingido pela tinta.\n", id);
+            }
+            else if (tipo_efeito == 'c') {
+                // Clone: cria novo segmento deslocado
+                double sx1 = get_segmento_x1(s);
+                double sy1 = get_segmento_y1(s);
+                double sx2 = get_segmento_x2(s);
+                double sy2 = get_segmento_y2(s);
+                
+                int novo_id = id_base++;
+                Segmento clone = create_segmento(novo_id,
+                                                 sx1 + dx, sy1 + dy,
+                                                 sx2 + dx, sy2 + dy);
+                insert(anteparos, clone);
+                fprintf(txt, "  -> Clonado Anteparo ID %d (Novo ID %d)\n", id, novo_id);
+                
+                // Atualiza o parâmetro para refletir o próximo ID
+                if (param_extra) {
+                    double *params = (double*)param_extra;
+                    params[2] = (double)id_base;
+                }
             }
         }
         p = p_next;

@@ -73,6 +73,10 @@ int main(int argc, char *argv[]) {
 
     printf("Lendo arquivo GEO: %s ...\n", geo_filename);
     ler_arquivo_geo(base_input_path, geo_filename, lista_formas, &max_id);
+    
+    // DEBUG: Verificar quantas formas foram lidas
+    int num_formas = length(lista_formas);
+    printf("DEBUG: %d formas lidas do arquivo .geo\n", num_formas);
 
     /* 6. Geração da Saída (SVG Inicial) */
     char svg_output_path[MAX_FULL_PATH];
