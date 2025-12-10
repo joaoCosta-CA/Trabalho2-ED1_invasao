@@ -1,3 +1,22 @@
+/**
+ * @file argumentos.h
+ * @brief Módulo de Processamento de Argumentos da Linha de Comando
+ * 
+ * Este módulo implementa funções para parsing e validação de argumentos
+ * da linha de comando do programa. Suporta opções com valores e validação
+ * de diretórios.
+ * 
+ * Opções suportadas:
+ * - -e: Diretório base de entrada
+ * - -f: Nome do arquivo .geo
+ * - -q: Nome do arquivo .qry
+ * - -o: Diretório de saída
+ * - -s: Algoritmo de ordenação (q/i/m)
+ * - -in: Cutoff para insertion sort (inteiro)
+ * 
+ * @author João Costa
+ */
+
 #ifndef ARGUMENTOS_H
 #define ARGUMENTOS_H
 

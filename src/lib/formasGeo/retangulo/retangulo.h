@@ -1,16 +1,24 @@
+/**
+ * @file retangulo.h
+ * @brief Módulo de Implementação de Retângulo
+ * 
+ * Este módulo fornece uma implementação completa para manipulação de retângulos
+ * geométricos em um espaço bidimensional. Cada retângulo é definido por uma
+ * posição (x, y), dimensões (largura e altura), cores de preenchimento e borda,
+ * além de possuir um identificador único.
+ * 
+ * @note A estrutura utiliza encapsulamento através de ponteiro opaco (void*).
+ * @note Todas as funções getter são seguras para uso com instâncias válidas.
+ * 
+ * @author João Costa
+ */
+
 #ifndef RETANGULO_H
 #define RETANGULO_H
 
 /**
- * @file retangulo.h
- * @brief módulo de implementação da estrutura de dados Retângulo
- * 
- * este módulo fornece uma implementação completa para manipulação de retângulos geométricos em um espaço bidimensional. Cada retângulo é definido por uma posição (x, y), dimensões (largura e altura), cores de preenchimento e borda, além de possuir um identificador único.
- * 
- * @note a estrutura utiliza encapsulamento através de ponteiro opaco (void*), garantindo abstração completa da implementação interna.
- * @note todas as funções getter são seguras para uso e retornam valores válidos quando recebem uma instância de Retangulo válida.
+ * @brief Tipo opaco para representação de retângulo.
  */
-
 typedef void* Retangulo;
 
 /**

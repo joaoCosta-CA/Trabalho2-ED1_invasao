@@ -1,16 +1,23 @@
-#ifndef LINHA_H
-#define LINHA_H
-
 /**
  * @file linha.h
- * @brief Módulo de implementação da estrutura de dados Linha
+ * @brief Módulo de Implementação de Linha
  * 
  * Este módulo fornece uma implementação completa para manipulação de linhas
  * geométricas em um espaço bidimensional. Cada linha é definida por dois pontos
  * (x1, y1) e (x2, y2) que determinam sua posição e orientação, além de possuir
  * um identificador único e uma cor associada.
+ * 
+ * @note A estrutura utiliza encapsulamento através de ponteiro opaco (void*).
+ * 
+ * @author João Costa
  */
 
+#ifndef LINHA_H
+#define LINHA_H
+
+/**
+ * @brief Tipo opaco para representação de linha.
+ */
 typedef void* Linha;
 
 /**

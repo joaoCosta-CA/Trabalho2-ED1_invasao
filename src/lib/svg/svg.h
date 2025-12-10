@@ -1,17 +1,40 @@
+/**
+ * @file svg.h
+ * @brief Módulo de Geração de Arquivos SVG
+ * 
+ * Este módulo implementa a geração de arquivos Scalable Vector Graphics (SVG)
+ * para visualização das formas geométricas, anteparos, polígono de visibilidade
+ * e pontos de bomba. O SVG é gerado em camadas ordenadas para correta sobreposição.
+ * 
+ * Camadas (da mais baixa para a mais alta):
+ * 1. Formas geométricas coloridas (círculos, retângulos, etc.)
+ * 2. Polígono de visibilidade (preenchimento vermelho semi-transparente)
+ * 3. Anteparos (linhas pretas)
+ * 4. Pontos de bomba (círculos amarelos)
+ * 
+ * @note O viewBox é calculado automaticamente para incluir todos elementos.
+ * 
+ * @author João Costa
+ */
+
 #ifndef SVG_WRITER_H
 #define SVG_WRITER_H
 
 #include "lista.h"
 
-/*
- * Gera um arquivo SVG contendo as camadas fornecidas.
- * * Parâmetros:
- * - formas: Lista de formas originais (Pode ser NULL)
- * - anteparos: Lista de segmentos de barreira (Pode ser NULL)
- * - poligono: Lista de segmentos da visibilidade (Pode ser NULL)
- * - caminho_arquivo: Destino do arquivo
+/**
+ * @brief Gera um arquivo SVG com as camadas visuais.
+ * 
+ * Cria um arquivo SVG contendo as formas geométricas, anteparos,
+ * polígono de visibilidade e pontos de bomba em camadas ordenadas.
+ * O viewBox é calculado automaticamente para incluir todos elementos.
+ * 
+ * @param formas Lista de formas geométricas (pode ser NULL)
+ * @param anteparos Lista de segmentos de anteparo (pode ser NULL)
+ * @param poligono Lista de segmentos do polígono de visibilidade (pode ser NULL)
+ * @param pontos_bombas Lista de vetores double[2] com coordenadas {x, y} (pode ser NULL)
+ * @param caminho_arquivo Caminho completo do arquivo SVG a criar
  */
-/* pontos_bombas: Lista de vetores double[2] contendo {x, y} */
 void gerar_svg(Lista formas, Lista anteparos, Lista poligono, 
                Lista pontos_bombas, const char *caminho_arquivo);
 

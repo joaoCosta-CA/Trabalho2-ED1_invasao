@@ -1,7 +1,23 @@
+/**
+ * @file estilo_texto.h
+ * @brief Módulo de Estilo de Texto para SVG
+ * 
+ * Este módulo implementa a estrutura de dados para armazenar configurações
+ * de estilo de texto utilizadas na renderização SVG. Define família da fonte,
+ * peso (normal/bold) e tamanho.
+ * 
+ * @note Utilizado pelo comando 'ts' do arquivo .geo.
+ * @note O estilo é aplicado a todos os textos subsequentes.
+ * 
+ * @author João Costa
+ */
+
 #ifndef ESTILO_TEXTO_H
 #define ESTILO_TEXTO_H
 
-/* Tipo opaco */
+/**
+ * @brief Tipo opaco para estilo de texto.
+ */
 typedef void* EstiloTexto;
 
 /*

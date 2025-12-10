@@ -1,13 +1,27 @@
+/**
+ * @file circulo.h
+ * @brief Módulo de Implementação de Círculo
+ * 
+ * Este módulo implementa a estrutura de dados e operações para manipulação
+ * de círculos geométricos em um espaço bidimensional. Cada círculo é definido
+ * por um centro (x, y), raio, cores de borda e preenchimento, além de um
+ * identificador único.
+ * 
+ * @note A estrutura utiliza encapsulamento através de ponteiro opaco (void*).
+ * @note Todas as funções getter são seguras para uso com instâncias válidas.
+ * 
+ * @author João Costa
+ */
+
 #ifndef CIRCULO_H
 #define CIRCULO_H
 
 /**
- * @brief Define um tipo opaco 'Circulo' usando um ponteiro void.
+ * @brief Tipo opaco para representação de círculo.
  * 
  * A estrutura interna é mantida oculta no arquivo .c, e os usuários
  * da biblioteca interagem apenas com este ponteiro.
  */
-
 typedef void* Circulo;
 
 /** 

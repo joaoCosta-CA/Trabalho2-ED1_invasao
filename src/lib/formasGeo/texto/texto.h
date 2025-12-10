@@ -1,8 +1,22 @@
+/**
+ * @file texto.h
+ * @brief Módulo de Implementação de Texto
+ * 
+ * Este módulo implementa a estrutura de dados para representação de texto
+ * geométrico em um espaço bidimensional. Cada texto é definido por uma
+ * posição âncora (x, y), conteúdo textual, cores e alinhamento.
+ * 
+ * @note A estrutura utiliza encapsulamento através de ponteiro opaco (void*).
+ * @note Suporta diferentes tipos de âncora para alinhamento do texto.
+ * 
+ * @author João Costa
+ */
+
 #ifndef TEXTO_H
 #define TEXTO_H
 
 /**
- * @brief define um tipo opaco 'Texto' usando um ponteiro void.
+ * @brief Tipo opaco para representação de texto.
  */
 typedef void *Texto;
 
