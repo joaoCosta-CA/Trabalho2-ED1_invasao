@@ -1,10 +1,12 @@
 #include <stdlib.h>
+#include <string.h>
 #include "segmento.h"
 
 typedef struct {
     int id;
     double x1, y1;
     double x2, y2;
+    char cor[32];
 } SegmentoStruct;
 
 Segmento create_segmento(int id, double x1, double y1, double x2, double y2) {
@@ -12,6 +14,7 @@ Segmento create_segmento(int id, double x1, double y1, double x2, double y2) {
     s->id = id;
     s->x1 = x1; s->y1 = y1;
     s->x2 = x2; s->y2 = y2;
+    strcpy(s->cor, "#008000"); // Verde padrão
     return (Segmento)s;
 }
 
@@ -20,5 +23,11 @@ double get_segmento_x1(Segmento s) { return ((SegmentoStruct*)s)->x1; }
 double get_segmento_y1(Segmento s) { return ((SegmentoStruct*)s)->y1; }
 double get_segmento_x2(Segmento s) { return ((SegmentoStruct*)s)->x2; }
 double get_segmento_y2(Segmento s) { return ((SegmentoStruct*)s)->y2; }
+const char* get_segmento_cor(Segmento s) { return ((SegmentoStruct*)s)->cor; }
+
+void set_segmento_cor(Segmento s, const char* cor) {
+    strncpy(((SegmentoStruct*)s)->cor, cor, 31);
+    ((SegmentoStruct*)s)->cor[31] = '\0';
+}
 
 void destroy_segmento(Segmento s) { free(s); }

@@ -45,9 +45,6 @@ int main() {
     
     Lista l = createList();
     
-    // --- Criação de Formas Dummy ---
-    // Ajuste os nomes das funções (createCirculo/CriarCirc) conforme seu .h exato
-    
     // 1. Círculo (Vermelho/Azul)
     void *c = CriarCirc(1, 100.0, 100.0, 50.0, "red", "blue");
     insert(l, create_forma(CIRCULO, c));
@@ -64,8 +61,8 @@ int main() {
     void *t = criar_texto(4, 300.0, 50.0, "black", "white", 'i', "TesteSVG");
     insert(l, create_forma(TEXTO, t));
 
-    printf("[SVG] 2. Gerando arquivo '%s'...\n", ARQUIVO_SAIDA);
-    gerar_svg(l, ARQUIVO_SAIDA);
+    printf("[SVG] 2. Gerando arquivo '%s'...\\n", ARQUIVO_SAIDA);
+    gerar_svg(l, NULL, NULL, NULL, ARQUIVO_SAIDA);
 
     printf("[SVG] 3. Verificando conteúdo do arquivo...\n");
 

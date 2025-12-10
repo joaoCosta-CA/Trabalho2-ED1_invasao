@@ -90,9 +90,8 @@ void processar_qry(const char *path_qry, const char *output_dir, const char *nom
     // Nome: nomegeo-nomeqry.svg
     sprintf(nome_final_svg, "%s/%s-%s.svg", output_dir, nome_base_geo, nome_qry_sem_ext);
     
-    printf("--> Gerando SVG Final: %s\n", nome_final_svg);
-    printf("[DEBUG] registros_visuais tem %d segmentos\n", length(registros_visuais));
-    printf("[DEBUG] lista_anteparos tem %d anteparos\n", length(lista_anteparos));
+
+
     
     gerar_svg(lista_formas, lista_anteparos, registros_visuais, pontos_bombas, nome_final_svg);
 
@@ -134,8 +133,8 @@ static void tratar_a(char *params, Lista lista_formas, Lista lista_anteparos, FI
             // 1. Gera lista de segmentos
             Lista novos_segs = transformar_em_anteparos(f, flag, id_seg);
             
-            fprintf(txt, "  - Forma ID %d removida e transformada em %d segmento(s).\n", 
-                    id_atual, length(novos_segs));
+            fprintf(txt, "  - Forma ID %d (%s) removida e transformada em %d segmento(s).\n", 
+                    id_atual, get_tipo_forma_str(f), length(novos_segs));
 
             // 2. Move segmentos para a lista de anteparos
             while (length(novos_segs) > 0) {
@@ -168,8 +167,6 @@ static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FI
                      char tipo_ord, int cutoff) {
     double x, y;
     char sfx[100];
-    printf("--- COMANDO D ---\n");
-    printf("Anteparos antes da explosão: %d\n", length(lista_anteparos));
     
     sscanf(params, "%lf %lf %s", &x, &y, sfx);
     fprintf(txt, "\n[*] Comando 'd': Bomba em (%.2f, %.2f) Sfx: %s\n", x, y, sfx);
@@ -189,8 +186,6 @@ static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FI
     // 3. APLICAÇÃO DOS EFEITOS
     processar_destruicao(lista_formas, poligono, txt);
     processar_efeito_em_anteparos(lista_anteparos, poligono, txt, 'd', NULL);
-
-    printf("Anteparos DEPOIS da explosão: %d\n", length(lista_anteparos));
 
     // 4. GERA SVG DE DEBUG
     if (strcmp(sfx, "-") != 0) {
@@ -227,13 +222,12 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
     pt[1] = y;
     insert(pontos_bombas, pt);
     
-    printf("[DEBUG CLN] ANTES cálculo polígono: %d anteparos\n", length(anteparos));
+
 
     // 1. Calcula a área atingida
     Lista poligono = obter_poligono_explosao(x, y, formas, anteparos, tipo_ord, cutoff);
     
-    printf("[DEBUG CLN] DEPOIS cálculo polígono: %d anteparos, polígono tem %d segmentos\n", 
-           length(anteparos), length(poligono));
+
 
     acumular_desenho(registros_visuais, poligono);
 
@@ -249,8 +243,8 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
             Forma clone = forma_clonar(f, (*id_global)++, dx, dy);
             if (clone) {
                 insert(novos_clones, clone);
-                fprintf(txt, "  -> Clonado Forma ID %d (Novo ID %d)\n", 
-                        get_forma_id_generico(f), get_forma_id_generico(clone));
+                fprintf(txt, "  -> Clonado: ID %d (%s) -> Novo ID %d\n", 
+                        get_forma_id_generico(f), get_tipo_forma_str(f), get_forma_id_generico(clone));
             }
         }
         p = getNext(formas, p);
@@ -266,7 +260,7 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
     processar_efeito_em_anteparos(anteparos, poligono, txt, 'c', (char*)clone_params);
     *id_global = (int)clone_params[2];
     
-    printf("[DEBUG CLN] DEPOIS clonagem: %d anteparos\n", length(anteparos));
+
     
     int total_clones = (*id_global - id_antes);
     if (total_clones > 0) {
@@ -301,8 +295,6 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
 static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros_visuais, Lista pontos_bombas, char tipo_ord, int cutoff) {
     double x, y;
     char cor[100], sfx[100];
-    printf("--- COMANDO P ---\n");
-    printf("Anteparos no momento da pintura: %d\n", length(anteparos));
 
     sscanf(params, "%lf %lf %s %s", &x, &y, cor, sfx);
     fprintf(txt, "\n[*] Comando 'p': Pintar em (%.2f, %.2f) cor: %s\n", x, y, cor);
@@ -317,16 +309,19 @@ static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, con
 
     acumular_desenho(registros_visuais, poligono);
 
-    // 2. Aplica a tinta
+    // 2. Aplica a tinta nas FORMAS
     Posic p = getFirst(formas);
     while (p) {
         Forma f = get(formas, p);
         if (forma_foi_atingida(f, poligono)) {
-            forma_atualizar_cor(f, cor); // Função do forma.c
-            fprintf(txt, "  -> Pintado ID %d\n", get_forma_id_generico(f));
+            forma_atualizar_cor(f, cor);
+            fprintf(txt, "  -> Pintado: ID %d (%s)\n", get_forma_id_generico(f), get_tipo_forma_str(f));
         }
         p = getNext(formas, p);
     }
+    
+    // 3. Aplica a tinta nos ANTEPAROS (não muda cor visual, apenas reporta)
+    processar_efeito_em_anteparos(anteparos, poligono, txt, 'p', cor);
 
     // 3. SVG de Debug
     if (strcmp(sfx, "-") != 0) {
@@ -390,17 +385,73 @@ static int forma_foi_atingida(Forma f, Lista poligono) {
             break;
         }
         case LINHA: {
-            // Testa o ponto médio
-            double mx = (linha_get_x1(dados) + linha_get_x2(dados)) / 2.0;
-            double my = (linha_get_y1(dados) + linha_get_y2(dados)) / 2.0;
+            // Testa os dois extremos e o ponto médio
+            double x1 = linha_get_x1(dados);
+            double y1 = linha_get_y1(dados);
+            double x2 = linha_get_x2(dados);
+            double y2 = linha_get_y2(dados);
+            double mx = (x1 + x2) / 2.0;
+            double my = (y1 + y2) / 2.0;
+            
+            // Testa pontos dentro do polígono
+            if (ponto_dentro_poligono(x1, y1, poligono)) return 1;
+            if (ponto_dentro_poligono(x2, y2, poligono)) return 1;
             if (ponto_dentro_poligono(mx, my, poligono)) return 1;
+            
+            // Testa intersecção com arestas do polígono (como projeto_exemplo)
+            Posic p = getFirst(poligono);
+            while (p) {
+                void *seg = get(poligono, p);
+                double sx1 = get_segmento_x1(seg);
+                double sy1 = get_segmento_y1(seg);
+                double sx2 = get_segmento_x2(seg);
+                double sy2 = get_segmento_y2(seg);
+                
+                if (tem_interseccao(x1, y1, x2, y2, sx1, sy1, sx2, sy2)) {
+                    return 1;
+                }
+                p = getNext(poligono, p);
+            }
             break;
         }
         case TEXTO: {
-            // Testa a âncora
+            // Testa a âncora + converte para linha de colisão (como projeto_exemplo)
             double tx = texto_get_x(dados);
             double ty = texto_get_y(dados);
             if (ponto_dentro_poligono(tx, ty, poligono)) return 1;
+            
+            // Cria linha de colisão a partir do texto (aproximação)
+            const char *conteudo = texto_get_conteudo(dados);
+            double comp = 10.0 * strlen(conteudo);
+            char ancora = texto_get_ancora(dados);
+            
+            double lx1, lx2;
+            if (ancora == 'i') {
+                lx1 = tx; lx2 = tx + comp;
+            } else if (ancora == 'f') {
+                lx1 = tx - comp; lx2 = tx;
+            } else { // meio
+                lx1 = tx - comp/2.0; lx2 = tx + comp/2.0;
+            }
+            
+            // Testa extremos da linha de colisão
+            if (ponto_dentro_poligono(lx1, ty, poligono)) return 1;
+            if (ponto_dentro_poligono(lx2, ty, poligono)) return 1;
+            
+            // Testa intersecção com arestas do polígono
+            Posic pt = getFirst(poligono);
+            while (pt) {
+                void *seg = get(poligono, pt);
+                double sx1 = get_segmento_x1(seg);
+                double sy1 = get_segmento_y1(seg);
+                double sx2 = get_segmento_x2(seg);
+                double sy2 = get_segmento_y2(seg);
+                
+                if (tem_interseccao(lx1, ty, lx2, ty, sx1, sy1, sx2, sy2)) {
+                    return 1;
+                }
+                pt = getNext(poligono, pt);
+            }
             break;
         }
         default:
@@ -411,17 +462,10 @@ static int forma_foi_atingida(Forma f, Lista poligono) {
 
 static Lista obter_poligono_explosao(double x, double y, Lista formas, Lista anteparos, char tipo_ord, int cutoff) {
 
-    // CRITICAL FIX: Only use anteparos for bbox!
-    // Start with VERY LARGE bbox to avoid bbox walls blocking vision
-    Lista lista_vazia = createList();
-    Limites box = calcular_limites_mundo(lista_vazia);
-    killList(lista_vazia, NULL);
+    // Calcula bounding box baseado nos conteúdos reais
+    Limites box = calcular_limites_mundo(formas);
     
-    // Expand to very large area (-1000 to 2000) so bbox walls don't interfere 
-    limites_expandir_ponto(box, -1000, -1000);
-    limites_expandir_ponto(box, 2000, 2000);
-    
-    // Then expand with bomb and anteparos
+    // Expande com ponto da bomba e anteparos
     limites_expandir_ponto(box, x, y);
     limites_expandir_segmentos(box, anteparos);
 
@@ -444,7 +488,7 @@ static void processar_destruicao(Lista formas, Lista poligono_visivel, FILE *txt
         if (forma_foi_atingida(f, poligono_visivel)) {
             int id = get_forma_id_generico(f);
             
-            fprintf(txt, "  -> Destruido: ID %d\n", id);
+            fprintf(txt, "  -> Destruido: ID %d (%s)\n", id, get_tipo_forma_str(f));
             
             removePosic(formas, p);
             destroy_forma(f);
@@ -457,14 +501,19 @@ static void processar_destruicao(Lista formas, Lista poligono_visivel, FILE *txt
 static void acumular_desenho(Lista acumulador, Lista poligono_atual) {
     if (!poligono_atual) return;
     
+    // Estrutura de ponto usada em visibilidade.c
+    typedef struct { double x, y; } PontoPoligono;
+    
     Posic p = getFirst(poligono_atual);
     while(p) {
-        Segmento s = get(poligono_atual, p);
-
-        Segmento copia = create_segmento(0, 
-                                         get_segmento_x1(s), get_segmento_y1(s),
-                                         get_segmento_x2(s), get_segmento_y2(s));
+        PontoPoligono *pt = (PontoPoligono*)get(poligono_atual, p);
+        
+        // Cria cópia do ponto
+        PontoPoligono *copia = malloc(sizeof(PontoPoligono));
+        copia->x = pt->x;
+        copia->y = pt->y;
         insert(acumulador, copia);
+        
         p = getNext(poligono_atual, p);
     }
 }
@@ -546,6 +595,8 @@ static void processar_efeito_em_anteparos(Lista anteparos, Lista poligono, FILE 
         id_base = (int)params[2];
     }
     
+    Lista novos_anteparos = createList();
+
     while (p) {
         Segmento s = get(anteparos, p);
         Posic p_next = getNext(anteparos, p);
@@ -559,7 +610,10 @@ static void processar_efeito_em_anteparos(Lista anteparos, Lista poligono, FILE 
                 destroy_segmento(s);
             }
             else if (tipo_efeito == 'p') {
-                 fprintf(txt, "  -> Anteparo ID %d atingido pela tinta.\n", id);
+                if (param_extra) {
+                    set_segmento_cor(s, param_extra);
+                }
+                fprintf(txt, "  -> Anteparo ID %d atingido pela tinta.\n", id);
             }
             else if (tipo_efeito == 'c') {
                 // Clone: cria novo segmento deslocado
@@ -572,7 +626,7 @@ static void processar_efeito_em_anteparos(Lista anteparos, Lista poligono, FILE 
                 Segmento clone = create_segmento(novo_id,
                                                  sx1 + dx, sy1 + dy,
                                                  sx2 + dx, sy2 + dy);
-                insert(anteparos, clone);
+                insert(novos_anteparos, clone);
                 fprintf(txt, "  -> Clonado Anteparo ID %d (Novo ID %d)\n", id, novo_id);
                 
                 // Atualiza o parâmetro para refletir o próximo ID
@@ -584,4 +638,12 @@ static void processar_efeito_em_anteparos(Lista anteparos, Lista poligono, FILE 
         }
         p = p_next;
     }
+
+    // Mescla os novos anteparos na lista principal
+    while(length(novos_anteparos) > 0) {
+        Posic p_tmp = getFirst(novos_anteparos);
+        Segmento c = removePosic(novos_anteparos, p_tmp);
+        insert(anteparos, c);
+    }
+    killList(novos_anteparos, NULL);
 }

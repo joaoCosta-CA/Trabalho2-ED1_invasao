@@ -173,71 +173,29 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
         Posic p = getFirst(anteparos);
         while (p) {
             void *s = get(anteparos, p);
-            fprintf(svg, "\t<line x1=\"%.2f\" y1=\"%.2f\" x2=\"%.2f\" y2=\"%.2f\" stroke=\"black\" stroke-width=\"2\" />\n",
-                    get_segmento_x1(s), get_segmento_y1(s), get_segmento_x2(s), get_segmento_y2(s));
+            fprintf(svg, "\t<line x1=\"%.2f\" y1=\"%.2f\" x2=\"%.2f\" y2=\"%.2f\" stroke=\"%s\" stroke-width=\"2\" />\n",
+                    get_segmento_x1(s), get_segmento_y1(s), get_segmento_x2(s), get_segmento_y2(s), get_segmento_cor(s));
             p = getNext(anteparos, p);
         }
     }
 
-    // 4. CAMADA 3: POLÍGONO DE VISIBILIDADE
-    if (poligono && length(poligono) > 0) {
+    // 4. CAMADA 3: POLÍGONO DE VISIBILIDADE (agora como lista de pontos)
+    if (poligono && length(poligono) >= 3) {
         fprintf(svg, "\t\n");
 
-        fprintf(svg, "\t<path d=\"");
+        // Estrutura de ponto usada em visibilidade.c
+        typedef struct { double x, y; } PontoPoligono;
+
+        fprintf(svg, "\t<polygon points=\"");
         
         Posic p = getFirst(poligono);
-        int primeiro = 1;
         while (p) {
-            void *s = get(poligono, p);
-            double x1 = get_segmento_x1(s);
-            double y1 = get_segmento_y1(s);
-            double x2 = get_segmento_x2(s);
-            double y2 = get_segmento_y2(s);
-
-            if (primeiro) {
-                fprintf(svg, "M %.2f %.2f L %.2f %.2f", x1, y1, x2, y2);
-                primeiro = 0;
-            } else {
-                fprintf(svg, " L %.2f %.2f", x2, y2);
-            }
+            PontoPoligono *pt = (PontoPoligono*)get(poligono, p);
+            fprintf(svg, "%.5f, %.5f ", pt->x, pt->y);
             p = getNext(poligono, p);
         }
-        // Fecha o caminho (Z) e define cor (sem borda aqui)
-        fprintf(svg, " Z\" fill=\"red\" fill-opacity=\"0.3\" stroke=\"none\" />\n");
-
-        p = getFirst(poligono);
-        while (p) {
-            void *s = get(poligono, p);
-            double x1 = get_segmento_x1(s); double y1 = get_segmento_y1(s);
-            double x2 = get_segmento_x2(s); double y2 = get_segmento_y2(s);
-
-            // Filtro da Linha Fantasma (Igual ao anterior)
-            int eh_linha_fantasma = 0;
-            if (pontos_bombas) {
-                Posic pb = getFirst(pontos_bombas);
-                while (pb) {
-                    double *pt = (double*) get(pontos_bombas, pb);
-                    double bx = pt[0]; double by = pt[1];
-
-                    if (fabs(y1 - y2) < 0.1 && fabs(y1 - by) < 0.1) {
-                        if (x1 > bx + 0.1 || x2 > bx + 0.1) {
-                            eh_linha_fantasma = 1;
-                            break; 
-                        }
-                    }
-                    pb = getNext(pontos_bombas, pb);
-                }
-            }
-            
-            // Só desenha a borda se NÃO for a linha fantasma
-            if (!eh_linha_fantasma) {
-                fprintf(svg, "\t<line x1=\"%.2f\" y1=\"%.2f\" x2=\"%.2f\" y2=\"%.2f\" "
-                             "stroke=\"red\" stroke-width=\"1\" stroke-opacity=\"0.4\" stroke-linecap=\"round\" />\n",
-                        x1, y1, x2, y2);
-            }
-            
-            p = getNext(poligono, p);
-        }
+        
+        fprintf(svg, "\" stroke=\"red\" fill=\"red\" fill-opacity=\"0.2\" />\n");
     }
 
     // 5. CAMADA 4: BOMBAS

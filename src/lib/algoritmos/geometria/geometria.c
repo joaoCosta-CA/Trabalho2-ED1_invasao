@@ -92,29 +92,38 @@ bool calcular_interseccao_raio_segmento(
 
 bool ponto_dentro_poligono(double px, double py, Lista poligono) {
     bool inside = false;
-    Posic p = getFirst(poligono);
-
-    while (p) {
-        void* seg = get(poligono, p);
-        double x1 = get_segmento_x1(seg);
-        double y1 = get_segmento_y1(seg);
-        double x2 = get_segmento_x2(seg);
-        double y2 = get_segmento_y2(seg);
-
-        // 1. Verifica se a coordenada Y do ponto está dentro do intervalo Y do segmento
-        if (((y1 > py) != (y2 > py))) {
-            
-            // 2. Calcula a coordenada X onde a linha horizontal cruza o segmento
-            double x_interseccao = (x2 - x1) * (py - y1) / (y2 - y1) + x1;
-
-            // 3. Verifica se o cruzamento acontece à direita do ponto P
+    
+    // Estrutura de ponto usada em visibilidade.c
+    typedef struct { double x, y; } PontoPoligono;
+    
+    int n = length(poligono);
+    if (n < 3) return false;
+    
+    Posic p_atual = getFirst(poligono);
+    int i = 0;
+    
+    while (p_atual) {
+        PontoPoligono *pt_i = (PontoPoligono*)get(poligono, p_atual);
+        
+        // Próximo ponto (circular)
+        Posic p_next = getNext(poligono, p_atual);
+        if (!p_next) p_next = getFirst(poligono);
+        PontoPoligono *pt_j = (PontoPoligono*)get(poligono, p_next);
+        
+        double xi = pt_i->x, yi = pt_i->y;
+        double xj = pt_j->x, yj = pt_j->y;
+        
+        // Ray-casting: verifica se raio horizontal cruza aresta
+        if (((yi > py) != (yj > py))) {
+            double x_interseccao = (xj - xi) * (py - yi) / (yj - yi) + xi;
             if (px < x_interseccao) {
                 inside = !inside;
             }
         }
-
-        p = getNext(poligono, p);
+        
+        p_atual = getNext(poligono, p_atual);
+        i++;
     }
-
+    
     return inside;
 }

@@ -4,30 +4,38 @@
 
 TARGET = ted
 CC = gcc
-# Flags base (Note que não listamos os -I aqui manualmente ainda)
 CFLAGS = -std=c99 -fstack-protector-all -Wall -Wextra -O0 -g -ggdb
 
-# Diretórios Raiz
 SRC_DIR = .
 LIB_DIR = ./lib
+TEST_DIR = ./testes_unitarios
 
-# Biblioteca Matemática
 LIBS = -lm
 
 # ---------------------------------------------------------
-# INCLUDES
+# INCLUDES (todas as pastas)
 # ---------------------------------------------------------
-# 1. Encontra TODAS as subpastas dentro de src e lib
 ALL_DIRS := $(shell find $(SRC_DIR) -type d)
-# 2. Adiciona o prefixo -I para cada diretório encontrado
 INC_FLAGS := $(addprefix -I,$(ALL_DIRS))
 
 # ---------------------------------------------------------
-# FONTES E OBJETOS
+# FONTES DA BIBLIOTECA (exclui main.c e testes)
 # ---------------------------------------------------------
-# Encontra todos os arquivos .c
-SRCS := $(shell find $(SRC_DIR) -name "*.c")
-OBJS := $(SRCS:.c=.o)
+LIB_SRCS := $(shell find $(LIB_DIR) -name "*.c")
+LIB_OBJS := $(LIB_SRCS:.c=.o)
+
+# ---------------------------------------------------------
+# FONTE PRINCIPAL
+# ---------------------------------------------------------
+MAIN_SRC = ./main.c
+MAIN_OBJ = $(MAIN_SRC:.c=.o)
+
+# ---------------------------------------------------------
+# FONTES DE TESTE
+# ---------------------------------------------------------
+TEST_SRCS := $(shell find $(TEST_DIR) -name "*.c")
+TEST_OBJS := $(TEST_SRCS:.c=.o)
+TEST_BINS := $(TEST_SRCS:.c=)
 
 # ---------------------------------------------------------
 # REGRAS DE COMPILAÇÃO
@@ -35,18 +43,45 @@ OBJS := $(SRCS:.c=.o)
 
 all: $(TARGET)
 
-$(TARGET): $(OBJS)
-	@echo "Linkando executável..."
-	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET) $(LIBS)
+# Programa principal
+$(TARGET): $(LIB_OBJS) $(MAIN_OBJ)
+	@echo "Linkando executavel principal..."
+	$(CC) $(CFLAGS) $(LIB_OBJS) $(MAIN_OBJ) -o $(TARGET) $(LIBS)
 
-# Regra para transformar .c em .o
+# Compilar testes como executaveis
+tests: $(LIB_OBJS) $(TEST_BINS)
+	@echo "Testes compilados com sucesso!"
+
+# Regra para cada executavel de teste
+$(TEST_DIR)/%: $(TEST_DIR)/%.o $(LIB_OBJS)
+	@echo "Linkando teste $@..."
+	$(CC) $(CFLAGS) $(LIB_OBJS) $< -o $@ $(LIBS)
+
+# Rodar todos os testes
+run-tests: tests
+	@echo ""
+	@echo "========================================="
+	@echo "       EXECUTANDO TESTES UNITARIOS      "
+	@echo "========================================="
+	@for test in $(TEST_BINS); do \
+		echo ""; \
+		echo "--- Rodando $$test ---"; \
+		./$$test || exit 1; \
+	done
+	@echo ""
+	@echo "========================================="
+	@echo "    TODOS OS TESTES PASSARAM!           "
+	@echo "========================================="
+
+# Regra generica .c -> .o
 %.o: %.c
 	@echo "Compilando $<..."
-	# AQUI ESTÁ O TRUQUE: $(INC_FLAGS) diz ao GCC onde procurar os .h
 	$(CC) $(CFLAGS) $(INC_FLAGS) -c $< -o $@
 
+# Limpeza
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(LIB_OBJS) $(MAIN_OBJ) $(TARGET)
+	rm -f $(TEST_OBJS) $(TEST_BINS)
 	rm -f *.txt *.svg
 
-.PHONY: clean all
+.PHONY: clean all tests run-tests

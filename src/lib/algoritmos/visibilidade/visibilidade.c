@@ -55,6 +55,83 @@ double calcular_angulo(double cy, double cx, double py, double px) {
     return ang;
 }
 
+/**
+ * Calcula a distância do raio até um segmento para um ângulo específico.
+ * Retorna INFINITY se o raio não cruza o segmento.
+ * Baseado no projeto_exemplo: dynamic_distance_to_barrier
+ */
+static double distancia_raio_segmento(double ox, double oy, double angulo, void* seg) {
+    const double EPSILON = 1e-12;
+    
+    double x1 = get_segmento_x1(seg);
+    double y1 = get_segmento_y1(seg);
+    double x2 = get_segmento_x2(seg);
+    double y2 = get_segmento_y2(seg);
+    
+    // Direção do raio
+    double rdx = cos(angulo);
+    double rdy = sin(angulo);
+    
+    // Direção do segmento
+    double sdx = x2 - x1;
+    double sdy = y2 - y1;
+    
+    // Vetor origem -> ponto inicial do segmento
+    double qpx = x1 - ox;
+    double qpy = y1 - oy;
+    
+    // Determinante (produto vetorial 2D)
+    double rxs = rdx * sdy - rdy * sdx;
+    
+    // Se paralelos, não há intersecção
+    if (fabs(rxs) < EPSILON) return INFINITY;
+    
+    // Parâmetro t (distância ao longo do raio)
+    double t = (qpx * sdy - qpy * sdx) / rxs;
+    
+    // Parâmetro u (posição ao longo do segmento, 0-1)
+    double u = (qpx * rdy - qpy * rdx) / rxs;
+    
+    // Ajusta para tolerância numérica
+    if (fabs(t) < EPSILON) t = 0.0;
+    if (fabs(u) < EPSILON) u = 0.0;
+    if (fabs(u - 1.0) < EPSILON) u = 1.0;
+    
+    // Intersecção válida: t >= 0 (à frente) e u in [0,1] (dentro do segmento)
+    if (t >= 0.0 && u >= 0.0 && u <= 1.0) return t;
+    
+    return INFINITY;
+}
+
+/**
+ * Calcula a distância do raio até a bounding box.
+ */
+static double distancia_raio_bbox(double ox, double oy, double angulo, 
+                                  double min_x, double min_y, double max_x, double max_y) {
+    const double EPSILON = 1e-12;
+    
+    double dx = cos(angulo);
+    double dy = sin(angulo);
+    double t_min = INFINITY;
+    
+    // Testa intersecção com cada lado da bbox
+    if (fabs(dx) > EPSILON) {
+        double t = (min_x - ox) / dx;
+        if (t >= 0) t_min = fmin(t_min, t);
+        t = (max_x - ox) / dx;
+        if (t >= 0) t_min = fmin(t_min, t);
+    }
+    
+    if (fabs(dy) > EPSILON) {
+        double t = (min_y - oy) / dy;
+        if (t >= 0) t_min = fmin(t_min, t);
+        t = (max_y - oy) / dy;
+        if (t >= 0) t_min = fmin(t_min, t);
+    }
+    
+    return t_min;
+}
+
 /* Construtor interno auxiliar */
 static Vertice criar_vertice_interno(double x, double y, double ang, double dist, int tipo, void* seg) {
     VerticeStruct *v = malloc(sizeof(VerticeStruct));
@@ -184,8 +261,6 @@ Vertice* preparar_vertices_ordenados(double cx, double cy, Lista lista_segs, int
 
     *qtd_out = count;
 
-    // Ordenação
-    // IMPORTANTE: Seu comparador deve tratar TIPO_FIM < TIPO_INICIO em caso de empate
     if (tipo_ord == 'm') merge_sort((void**)vetor, count, cutoff, comparar_vertices);
     else quick_sort((void**)vetor, count, comparar_vertices);
 
@@ -194,8 +269,6 @@ Vertice* preparar_vertices_ordenados(double cx, double cy, Lista lista_segs, int
 
 void destroy_vertice(Vertice v) {
     if (v == NULL) return;
-    
-    // Libera apenas a estrutura do vértice criada no 'preparar_vertices'
     free(v);
 }
 
@@ -291,18 +364,87 @@ int comparar_segmentos_arvore(const void* a, const void* b) {
     return (get_segmento_id(s1) < get_segmento_id(s2)) ? -1 : 1;
 }
 
-static void adicionar_aresta_visivel(Lista poligono, double x1, double y1, double x2, double y2) {
-    const double epsilon = 1e-9;
-    double dx = x2 - x1;
-    double dy = y2 - y1;
-    
-    // Filter degenerate edges
-    if (fabs(dx) < epsilon && fabs(dy) < epsilon) {
-        return;
-    }
+// Limites originais para recorte (sem margem das paredes)
+static double CLIP_MIN_X, CLIP_MIN_Y, CLIP_MAX_X, CLIP_MAX_Y;
 
-    static int id_gen = 90000; 
-    insert(poligono, create_segmento(id_gen++, x1, y1, x2, y2));
+static void set_polygon_clip_bounds(double min_x, double min_y, double max_x, double max_y) {
+    CLIP_MIN_X = min_x;
+    CLIP_MIN_Y = min_y;
+    CLIP_MAX_X = max_x;
+    CLIP_MAX_Y = max_y;
+}
+
+static void clamp_point_to_bounds(double *x, double *y) {
+    if (*x < CLIP_MIN_X) *x = CLIP_MIN_X;
+    if (*x > CLIP_MAX_X) *x = CLIP_MAX_X;
+    if (*y < CLIP_MIN_Y) *y = CLIP_MIN_Y;
+    if (*y > CLIP_MAX_Y) *y = CLIP_MAX_Y;
+}
+
+// Variáveis estáticas para bbox (usadas pelo raycast)
+static double BBOX_MIN_X, BBOX_MIN_Y, BBOX_MAX_X, BBOX_MAX_Y;
+
+static void set_bbox_limits(double min_x, double min_y, double max_x, double max_y) {
+    BBOX_MIN_X = min_x;
+    BBOX_MIN_Y = min_y;
+    BBOX_MAX_X = max_x;
+    BBOX_MAX_Y = max_y;
+}
+
+/**
+ * Lança um raio na direção do ângulo e retorna o ponto de intersecção mais próximo.
+ * Baseado no projeto_exemplo: raycast
+ */
+static void raycast(double ox, double oy, double angulo, Arvore ativos, Lista anteparos,
+                    double *out_x, double *out_y) {
+    double dist_min = INFINITY;
+    
+    // 1. Verifica intersecção com todos os segmentos ativos na árvore
+    Posic p = tree_get_first(ativos);
+    while (p) {
+        void* seg = tree_get_value(ativos, p);
+        if (seg) {
+            double d = distancia_raio_segmento(ox, oy, angulo, seg);
+            if (d < dist_min) dist_min = d;
+        }
+        p = tree_get_next(ativos, p);
+    }
+    
+    // 2. (Removido) Não verificar todos os anteparos. Confiar na árvore de ativos.
+    // O loop anterior causava erro ao detectar colisão com segmentos que ainda não deveriam estar ativos (no PRE-raycast).
+    
+    // 3. Fallback para a bbox
+    double dist_bbox = distancia_raio_bbox(ox, oy, angulo, BBOX_MIN_X, BBOX_MIN_Y, BBOX_MAX_X, BBOX_MAX_Y);
+    if (dist_bbox < dist_min) dist_min = dist_bbox;
+    
+    // Calcula ponto de intersecção
+    *out_x = ox + dist_min * cos(angulo);
+    *out_y = oy + dist_min * sin(angulo);
+}
+
+// Estrutura simples para ponto (x,y) - usada no polígono de visibilidade
+typedef struct {
+    double x, y;
+} PontoPoligono;
+
+static PontoPoligono* criar_ponto_poligono(double x, double y) {
+    PontoPoligono *p = malloc(sizeof(PontoPoligono));
+    p->x = x;
+    p->y = y;
+    return p;
+}
+
+// Adiciona um ponto ao polígono (lista de pontos)
+static void adicionar_ponto_poligono(Lista poligono, double x, double y) {
+    // Evita pontos duplicados consecutivos
+    Posic ultimo = getLast(poligono);
+    if (ultimo) {
+        PontoPoligono *p_ultimo = (PontoPoligono*)get(poligono, ultimo);
+        if (fabs(p_ultimo->x - x) < 1e-6 && fabs(p_ultimo->y - y) < 1e-6) {
+            return; // Ponto duplicado, não adiciona
+        }
+    }
+    insert(poligono, criar_ponto_poligono(x, y));
 }
 
 
@@ -401,27 +543,30 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_m
     // 1. CONFIGURA CONTEXTO
     set_contexto_bomba(bx, by);
 
-    // 2. CRIA PAREDES DO MUNDO (Usa o parâmetro box_mundo aqui!)
-    // Recupera os valores da caixa para fechar o mundo
-    double min_x = get_limites_min_x(box_mundo) - 50.0;
-    double max_x = get_limites_max_x(box_mundo) + 50.0;
-    double min_y = get_limites_min_y(box_mundo) - 50.0;
-    double max_y = get_limites_max_y(box_mundo) + 50.0;
+    // 2. CRIA PAREDES DO MUNDO - BBOX FIXA 0-1024 (como projeto_exemplo)
+    // Isso garante que os raios sempre atinjam uma borda definida
+    double min_x = 0.0;
+    double max_x = 1024.0;
+    double min_y = 0.0;
+    double max_y = 1024.0;
 
     // ID temporário seguro
     int id_temp = 99000;
 
-    // Cria os 4 segmentos
-    Segmento p1 = create_segmento(id_temp++, min_x, min_y, max_x, min_y);
-    Segmento p2 = create_segmento(id_temp++, max_x, min_y, max_x, max_y);
-    Segmento p3 = create_segmento(id_temp++, max_x, max_y, min_x, max_y);
-    Segmento p4 = create_segmento(id_temp++, min_x, max_y, min_x, min_y);
+    // Cria os 4 segmentos (sentido min -> max, igual projeto_exemplo)
+    Segmento p1 = create_segmento(id_temp++, min_x, min_y, max_x, min_y); // Topo
+    Segmento p2 = create_segmento(id_temp++, max_x, min_y, max_x, max_y); // Direita
+    Segmento p3 = create_segmento(id_temp++, min_x, max_y, max_x, max_y); // Baixo (Corrigido)
+    Segmento p4 = create_segmento(id_temp++, min_x, min_y, min_x, max_y); // Esquerda (Corrigido)
 
     // Insere e guarda posição para remoção rápida (O(1))
     Posic no_p1 = insert(anteparos, p1);
     Posic no_p2 = insert(anteparos, p2);
     Posic no_p3 = insert(anteparos, p3);
     Posic no_p4 = insert(anteparos, p4);
+    
+    // Define os limites da bbox para a função raycast
+    set_bbox_limits(min_x, min_y, max_x, max_y);
 
     // 3. PREPARAÇÃO (Vértices e Árvore)
     int qtd_eventos = 0;
@@ -430,110 +575,56 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_m
     Lista poligono_visivel = createList();
     Arvore ativos = tree_create(comparar_segmentos_arvore);
     
-    // 4. PRÉ-PROCESSAMENTO DO EIXO ZERO (Biombo Inicial)
-    void* biombo_atual = NULL;
-    double menor_dist_sq = -1.0;
-
-    Posic p_ant = getFirst(anteparos);
-    while(p_ant) {
-        void* s = get(anteparos, p_ant);
-        double sx1 = get_segmento_x1(s); double sy1 = get_segmento_y1(s);
-        double sx2 = get_segmento_x2(s); double sy2 = get_segmento_y2(s);
-
-        // Verifica se corta o raio Y = by para X > bx
-        if ((sy1 > by && sy2 <= by) || (sy2 > by && sy1 <= by)) {
-            double t = (by - sy1) / (sy2 - sy1);
-            double x_int = sx1 + t * (sx2 - sx1);
-
-            if (x_int > bx) { 
-                double d = dist_sq(bx, by, x_int, by);
-                if (menor_dist_sq < 0 || d < menor_dist_sq) {
-                    menor_dist_sq = d;
-                    biombo_atual = s;
-                }
-            }
+    // 4. PRÉ-CARREGAMENTO DE BARREIRAS NO ÂNGULO 0 (como projeto_exemplo)
+    // Isso garante que barreiras que começam no ângulo 0 estejam ativas no início da varredura
+    const double EPSILON_ANGLE = 1e-9;
+    for (int i = 0; i < qtd_eventos; i++) {
+        Vertice v = eventos[i];
+        double angulo = get_vertice_angulo(v);
+        int tipo = get_vertice_tipo(v);
+        
+        if (tipo == TIPO_INICIO && angulo < EPSILON_ANGLE) {
+            void* seg_v = get_vertice_segmento(v);
+            double dist_key = get_vertice_distancia(v);
+            tree_insert_with_key(&ativos, dist_key, seg_v);
         }
-        p_ant = getNext(anteparos, p_ant);
     }
 
-    // Define ponto inicial do desenho
-    double ponto_ant_x, ponto_ant_y;
-    if (biombo_atual) {
-        double dummy_y;
-        calcular_interseccao(bx, by, bx+1000, by, 
-                             get_segmento_x1(biombo_atual), get_segmento_y1(biombo_atual),
-                             get_segmento_x2(biombo_atual), get_segmento_y2(biombo_atual),
-                             &ponto_ant_x, &dummy_y);
-        ponto_ant_y = by;
-    } else {
-        ponto_ant_x = bx; ponto_ant_y = by;
-    }
 
-    // 5. VARREDURA ANGULAR - Using numeric keys like reference  
+    // 5. VARREDURA ANGULAR - Padrão pre/post update (baseado no projeto_exemplo)
+    
+    // Adiciona ponto inicial no ângulo 0 SEMPRE
+    // Isso garante o fechamento correto do polígono na borda direita
+    double init_x, init_y;
+    raycast(bx, by, 0.0, ativos, anteparos, &init_x, &init_y);
+    adicionar_ponto_poligono(poligono_visivel, init_x, init_y);
+
     for (int idx = 0; idx < qtd_eventos; idx++) {
         Vertice v = eventos[idx];
         int tipo = get_vertice_tipo(v);
         void* seg_v = get_vertice_segmento(v);
-        
-        double vx = get_vertice_x(v);
-        double vy = get_vertice_y(v);
+        double angulo = get_vertice_angulo(v);
         double dist_key = get_vertice_distancia(v);
         
+        // Pula eventos de início no ângulo 0 (já foram pré-carregados)
+        if (tipo == TIPO_INICIO && angulo < EPSILON_ANGLE) continue;
+        
+        // PRE-UPDATE: Faz raycast ANTES de atualizar a árvore
+        double pre_x, pre_y;
+        raycast(bx, by, angulo, ativos, anteparos, &pre_x, &pre_y);
+        adicionar_ponto_poligono(poligono_visivel, pre_x, pre_y);
+        
+        // ATUALIZA ÁRVORE
         if (tipo == TIPO_INICIO) {
             tree_insert_with_key(&ativos, dist_key, seg_v);
         } else {
             tree_remove_with_key(ativos, dist_key, seg_v);
         }
         
-        // Check if there's an intersection blocking the view to this vertex
-        double min_t = 1.0;
-        int found_intersection = 0;
-        double int_x, int_y;
-        
-        // Iterate through all active segments
-        Posic p = tree_get_first(ativos);
-        while (p) {
-            void* seg_ativo = tree_get_value(ativos, p);
-            
-            if (seg_ativo) {
-                double ix, iy;
-                if (calcular_interseccao_raio_segmento(bx, by, vx, vy,
-                                                       get_segmento_x1(seg_ativo),
-                                                       get_segmento_y1(seg_ativo),
-                                                       get_segmento_x2(seg_ativo),
-                                                       get_segmento_y2(seg_ativo),
-                                                       &ix, &iy)) {
-                    // Calculate t parameter
-                    double dx = vx - bx;
-                    double dy = vy - by;
-                    double len_sq = dx*dx + dy*dy;
-                    
-                    if (len_sq > 1e-9) {
-                        double t_param = ((ix - bx)*dx + (iy - by)*dy) / len_sq;
-                        
-                        if (t_param > 1e-9 && t_param < min_t) {
-                            min_t = t_param;
-                            int_x = ix;
-                            int_y = iy;
-                            found_intersection = 1;
-                        }
-                    }
-                }
-            }
-            
-            p = tree_get_next(ativos, p);
-        }
-        
-        // Add points following reference logic
-        if (found_intersection && min_t < 0.999999) {
-            adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, int_x, int_y);
-            ponto_ant_x = int_x;
-            ponto_ant_y = int_y;
-        } else {
-            adicionar_aresta_visivel(poligono_visivel, ponto_ant_x, ponto_ant_y, vx, vy);
-            ponto_ant_x = vx;
-            ponto_ant_y = vy;
-        }
+        // POST-UPDATE: Faz raycast APÓS atualizar a árvore
+        double post_x, post_y;
+        raycast(bx, by, angulo, ativos, anteparos, &post_x, &post_y);
+        adicionar_ponto_poligono(poligono_visivel, post_x, post_y);
     }
 
     // 6. LIMPEZA INTERNA

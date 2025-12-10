@@ -58,8 +58,7 @@ int main() {
     criar_arquivo_qry();
 
     printf("[QRY] 2. Processando QRY...\n");
-    // processar_qry(caminho_qry, saida, nome_geo, lista_formas)
-    processar_qry(QRY_FILE, OUTPUT_DIR, GEO_NAME, formas);
+    processar_qry(QRY_FILE, OUTPUT_DIR, GEO_NAME, formas, 'q', 10);
 
     printf("[QRY] 3. Verificando relatórios...\n");
     

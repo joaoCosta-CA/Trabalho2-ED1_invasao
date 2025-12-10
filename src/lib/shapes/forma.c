@@ -63,7 +63,6 @@ int get_forma_id_generico(Forma f) {
     if (!f) return -1;
     FormaStruct *fs = (FormaStruct *)f;
     
-    // Você precisa ter os getters específicos implementados nos módulos
     switch (fs->tipo) {
         case CIRCULO:   return circulo_get_id(fs->dados);
         case RETANGULO: return retangulo_get_id(fs->dados);
@@ -72,8 +71,6 @@ int get_forma_id_generico(Forma f) {
         default: return -1;
     }
 }
-
-/* ... includes anteriores ... */
 
 void forma_atualizar_cor(Forma f, const char *cor) {
     if (!f) return;
@@ -123,8 +120,6 @@ Forma forma_clonar(Forma f, int novo_id, double dx, double dy) {
             novos_dados = texto_clonar(fs->dados, novo_id, dx, dy);
             break;
         case ESTILO_TEXTO:
-            // Geralmente não clonamos definições de estilo via comando 'cln' geométrico
-            // Mas se precisar, implemente estilo_clonar
             return NULL; 
         default:
             return NULL;
@@ -134,6 +129,19 @@ Forma forma_clonar(Forma f, int novo_id, double dx, double dy) {
         return create_forma(fs->tipo, novos_dados);
     }
     
-    // CORREÇÃO DO WARNING "control reaches end":
     return NULL; 
+}
+
+const char* get_tipo_forma_str(Forma f) {
+    if (!f) return "desconhecido";
+    FormaStruct *fs = (FormaStruct *)f;
+    
+    switch(fs->tipo) {
+        case CIRCULO:      return "circulo";
+        case RETANGULO:    return "retangulo";
+        case LINHA:        return "linha";
+        case TEXTO:        return "texto";
+        case ESTILO_TEXTO: return "estilo_texto";
+        default:           return "desconhecido";
+    }
 }

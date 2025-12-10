@@ -67,6 +67,20 @@ double get_segmento_x2(Segmento s);
 double get_segmento_y2(Segmento s);
 
 /**
+ * @brief Obtém a cor do segmento.
+ * @param s Segmento a consultar
+ * @return Cor no formato hex (ex: "#008000")
+ */
+const char* get_segmento_cor(Segmento s);
+
+/**
+ * @brief Define a cor do segmento.
+ * @param s Segmento a modificar
+ * @param cor Nova cor no formato hex
+ */
+void set_segmento_cor(Segmento s, const char* cor);
+
+/**
  * @brief Libera memória do segmento.
  * @param s Segmento a destruir
  */

@@ -23,14 +23,12 @@ Limites calcular_limites_mundo(Lista formas) {
     // Aloca a estrutura na memória (Heap)
     StLimites *box = (StLimites*) malloc(sizeof(StLimites));
     
-    // Inicializa com valores invertidos
+    // Inicializa com valores invertidos para permitir expansão correta
     box->min_x = DBL_MAX;  box->min_y = DBL_MAX;
     box->max_x = -DBL_MAX; box->max_y = -DBL_MAX;
 
     if (!formas || length(formas) == 0) {
-        // Valores padrão se lista vazia
-        box->min_x = 0; box->min_y = 0;
-        box->max_x = 1000; box->max_y = 1000;
+        // Retorna bbox vazia (com valores invertidos) para ser expandida depois
         return (Limites)box;
     }
 

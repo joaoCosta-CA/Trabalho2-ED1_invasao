@@ -84,4 +84,11 @@ void forma_atualizar_cor(Forma f, const char *cor);
  */
 Forma forma_clonar(Forma f, int novo_id, double dx, double dy);
 
+/**
+ * @brief Obtém o nome do tipo da forma como string.
+ * @param f Forma a consultar
+ * @return String com o nome do tipo ("circulo", "retangulo", etc.)
+ */
+const char* get_tipo_forma_str(Forma f);
+
 #endif
