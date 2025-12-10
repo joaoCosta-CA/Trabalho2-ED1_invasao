@@ -529,53 +529,19 @@ static int anteparo_foi_atingido(Segmento s, Lista poligono) {
     double x2 = get_segmento_x2(s);
     double y2 = get_segmento_y2(s);
     
-    // Verifica se alguma ponta do anteparo está dentro do polígono
+    // Um anteparo é atingido se pelo menos uma de suas pontas está DENTRO do polígono.
+    // Anteparos que apenas DEFINEM A BORDA do polígono (bloqueando a visão) não são atingidos.
+    // O ponto_dentro_poligono usa ray-casting que retorna false para pontos na borda.
     if (ponto_dentro_poligono(x1, y1, poligono) || 
         ponto_dentro_poligono(x2, y2, poligono)) {
         return 1;
     }
     
-    // Verifica se o anteparo intersecta ou TOCA qualquer aresta do polígono
-    Posic p = getFirst(poligono);
-    while (p) {
-        Segmento seg_poly = get(poligono, p);
-        double px1 = get_segmento_x1(seg_poly);
-        double py1 = get_segmento_y1(seg_poly);
-        double px2 = get_segmento_x2(seg_poly);
-        double py2 = get_segmento_y2(seg_poly);
-        
-        // Verifica interseção
-        if (tem_interseccao(x1, y1, x2, y2, px1, py1, px2, py2)) {
-            return 1;
-        }
-        
-        // NOVO: Verifica se ponta do anteparo está SOBRE a aresta do polígono
-        // (ray-casting não detecta pontos exatamente na borda)
-        double tol = 1.0;  // Tolerância de 1 pixel
-        
-        // Verifica se (x1,y1) está sobre o segmento (px1,py1)-(px2,py2)
-        double seg_len = sqrt((px2-px1)*(px2-px1) + (py2-py1)*(py2-py1));
-        if (seg_len > 0.001) {
-            // Distância perpendicular do ponto ao segmento
-            double dist1 = fabs((py2-py1)*x1 - (px2-px1)*y1 + px2*py1 - py2*px1) / seg_len;
-            // Verifica se está dentro do "retângulo" do segmento
-            double minx = (px1 < px2 ? px1 : px2) - tol;
-            double maxx = (px1 > px2 ? px1 : px2) + tol;
-            double miny = (py1 < py2 ? py1 : py2) - tol;
-            double maxy = (py1 > py2 ? py1 : py2) + tol;
-            
-            if (dist1 < tol && x1 >= minx && x1 <= maxx && y1 >= miny && y1 <= maxy) {
-                return 1;  // Ponta 1 do anteparo está sobre aresta do polígono
-            }
-            
-            // Verifica se (x2,y2) está sobre o segmento
-            double dist2 = fabs((py2-py1)*x2 - (px2-px1)*y2 + px2*py1 - py2*px1) / seg_len;
-            if (dist2 < tol && x2 >= minx && x2 <= maxx && y2 >= miny && y2 <= maxy) {
-                return 1;  // Ponta 2 do anteparo está sobre aresta do polígono
-            }
-        }
-        
-        p = getNext(poligono, p);
+    // Também verifica o ponto médio para segmentos que cruzam o polígono
+    double mx = (x1 + x2) / 2.0;
+    double my = (y1 + y2) / 2.0;
+    if (ponto_dentro_poligono(mx, my, poligono)) {
+        return 1;
     }
     
     return 0;

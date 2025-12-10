@@ -261,6 +261,19 @@ Vertice* preparar_vertices_ordenados(double cx, double cy, Lista lista_segs, int
 
     *qtd_out = count;
 
+    // DEBUG: Mostrar eventos criados
+    printf("[DBG] Eventos criados: %d para %d segmentos\n", count, length(lista_segs));
+    for (int i = 0; i < count; i++) {
+        Vertice v = vetor[i];
+        double ang = get_vertice_angulo(v);
+        int tipo = get_vertice_tipo(v);
+        void* seg = get_vertice_segmento(v);
+        int id = get_segmento_id(seg);
+        double ang_deg = ang * 180.0 / M_PI;
+        printf("  [%d] Seg ID=%d, Tipo=%s, Angulo=%.2f rad (%.1f graus)\n", 
+               i, id, (tipo == TIPO_INICIO ? "INICIO" : "FIM"), ang, ang_deg);
+    }
+
     if (tipo_ord == 'm') merge_sort((void**)vetor, count, cutoff, comparar_vertices);
     else quick_sort((void**)vetor, count, comparar_vertices);
 
@@ -420,6 +433,14 @@ static void raycast(double ox, double oy, double angulo, Arvore ativos, Lista an
     // Calcula ponto de intersecção
     *out_x = ox + dist_min * cos(angulo);
     *out_y = oy + dist_min * sin(angulo);
+    
+    // DEBUG
+    double ang_deg = angulo * 180.0 / M_PI;
+    int n_ativos = 0;
+    Posic p_dbg = tree_get_first(ativos);
+    while (p_dbg) { n_ativos++; p_dbg = tree_get_next(ativos, p_dbg); }
+    printf("[RAYCAST] ang=%.1f, ativos=%d, dist=%.2f, ponto=(%.2f, %.2f)\n", 
+           ang_deg, n_ativos, dist_min, *out_x, *out_y);
 }
 
 // Estrutura simples para ponto (x,y) - usada no polígono de visibilidade
@@ -543,12 +564,13 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_m
     // 1. CONFIGURA CONTEXTO
     set_contexto_bomba(bx, by);
 
-    // 2. CRIA PAREDES DO MUNDO - BBOX FIXA 0-1024 (como projeto_exemplo)
-    // Isso garante que os raios sempre atinjam uma borda definida
-    double min_x = 0.0;
-    double max_x = 1024.0;
-    double min_y = 0.0;
-    double max_y = 1024.0;
+    // 2. CRIA PAREDES DO MUNDO - BBOX DINÂMICA baseada no conteúdo
+    // Usa o bounding box passado como parâmetro, com uma margem de segurança
+    double margin = 50.0;
+    double min_x = get_limites_min_x(box_mundo) - margin;
+    double max_x = get_limites_max_x(box_mundo) + margin;
+    double min_y = get_limites_min_y(box_mundo) - margin;
+    double max_y = get_limites_max_y(box_mundo) + margin;
 
     // ID temporário seguro
     int id_temp = 99000;
@@ -556,8 +578,8 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_m
     // Cria os 4 segmentos (sentido min -> max, igual projeto_exemplo)
     Segmento p1 = create_segmento(id_temp++, min_x, min_y, max_x, min_y); // Topo
     Segmento p2 = create_segmento(id_temp++, max_x, min_y, max_x, max_y); // Direita
-    Segmento p3 = create_segmento(id_temp++, min_x, max_y, max_x, max_y); // Baixo (Corrigido)
-    Segmento p4 = create_segmento(id_temp++, min_x, min_y, min_x, max_y); // Esquerda (Corrigido)
+    Segmento p3 = create_segmento(id_temp++, min_x, max_y, max_x, max_y); // Baixo
+    Segmento p4 = create_segmento(id_temp++, min_x, min_y, min_x, max_y); // Esquerda
 
     // Insere e guarda posição para remoção rápida (O(1))
     Posic no_p1 = insert(anteparos, p1);
