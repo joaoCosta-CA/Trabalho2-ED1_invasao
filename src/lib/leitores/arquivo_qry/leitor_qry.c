@@ -30,6 +30,7 @@ static int forma_foi_atingida(Forma f, Lista poligono);
 static void acumular_desenho(Lista acumulador, Lista poligono_atual);
 static void extrair_nome_base(const char *path, char *dest);
 static void destroy_segmento_void(void *p);
+static void destroy_poligono_lista(void *p);
 static int anteparo_foi_atingido(Segmento s, Lista poligono);
 static void processar_efeito_em_anteparos(Lista anteparos, Lista poligono, FILE *txt, char tipo_efeito, char* cor_pintura);
 
@@ -103,7 +104,7 @@ void processar_qry(const char *path_qry, const char *output_dir, const char *nom
     fclose(qry);
     fclose(txt);
     
-    killList(registros_visuais, destroy_segmento_void);
+    killList(registros_visuais, destroy_poligono_lista);
     
     killList(lista_anteparos, destroy_segmento_void);
 
@@ -287,6 +288,7 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
         else sprintf(path, "%s-%s.svg", nome_base_combo, sfx);
         
         gerar_svg(NULL, NULL, poligono, temp_bomba, path);
+        killList(temp_bomba, NULL);
     }
     
     killList(poligono, destroy_segmento_void);
@@ -335,6 +337,7 @@ static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, con
         else sprintf(path, "%s-%s.svg", nome_base_combo, sfx);
         
         gerar_svg(NULL, NULL, poligono, temp_bomba, path);
+        killList(temp_bomba, NULL);
     }
     
     // Limpeza do polígono
@@ -402,18 +405,27 @@ static int forma_foi_atingida(Forma f, Lista poligono) {
             if (ponto_dentro_poligono(mx, my, poligono)) return 1;
             
             // Testa intersecção com arestas do polígono
+            // O polígono é uma lista de PontoPoligono (x, y), não Segmento
+            typedef struct { double x, y; } PontoPoligono;
             Posic p = getFirst(poligono);
-            while (p) {
-                void *seg = get(poligono, p);
-                double sx1 = get_segmento_x1(seg);
-                double sy1 = get_segmento_y1(seg);
-                double sx2 = get_segmento_x2(seg);
-                double sy2 = get_segmento_y2(seg);
+            Posic p_next = p ? getNext(poligono, p) : NULL;
+            while (p && p_next) {
+                PontoPoligono *pt1 = (PontoPoligono*)get(poligono, p);
+                PontoPoligono *pt2 = (PontoPoligono*)get(poligono, p_next);
                 
-                if (tem_interseccao(x1, y1, x2, y2, sx1, sy1, sx2, sy2)) {
+                if (tem_interseccao(x1, y1, x2, y2, pt1->x, pt1->y, pt2->x, pt2->y)) {
                     return 1;
                 }
-                p = getNext(poligono, p);
+                p = p_next;
+                p_next = getNext(poligono, p_next);
+            }
+            // Fecha o polígono (último ponto -> primeiro ponto)
+            if (length(poligono) > 2) {
+                PontoPoligono *pt_last = (PontoPoligono*)get(poligono, getLast(poligono));
+                PontoPoligono *pt_first = (PontoPoligono*)get(poligono, getFirst(poligono));
+                if (tem_interseccao(x1, y1, x2, y2, pt_last->x, pt_last->y, pt_first->x, pt_first->y)) {
+                    return 1;
+                }
             }
             break;
         }
@@ -442,18 +454,27 @@ static int forma_foi_atingida(Forma f, Lista poligono) {
             if (ponto_dentro_poligono(lx2, ty, poligono)) return 1;
             
             // Testa intersecção com arestas do polígono
+            // O polígono é uma lista de PontoPoligono (x, y), não Segmento
+            typedef struct { double x, y; } PontoPoligono2;
             Posic pt = getFirst(poligono);
-            while (pt) {
-                void *seg = get(poligono, pt);
-                double sx1 = get_segmento_x1(seg);
-                double sy1 = get_segmento_y1(seg);
-                double sx2 = get_segmento_x2(seg);
-                double sy2 = get_segmento_y2(seg);
+            Posic pt_next = pt ? getNext(poligono, pt) : NULL;
+            while (pt && pt_next) {
+                PontoPoligono2 *ppt1 = (PontoPoligono2*)get(poligono, pt);
+                PontoPoligono2 *ppt2 = (PontoPoligono2*)get(poligono, pt_next);
                 
-                if (tem_interseccao(lx1, ty, lx2, ty, sx1, sy1, sx2, sy2)) {
+                if (tem_interseccao(lx1, ty, lx2, ty, ppt1->x, ppt1->y, ppt2->x, ppt2->y)) {
                     return 1;
                 }
-                pt = getNext(poligono, pt);
+                pt = pt_next;
+                pt_next = getNext(poligono, pt_next);
+            }
+            // Fecha o polígono
+            if (length(poligono) > 2) {
+                PontoPoligono2 *ppt_last = (PontoPoligono2*)get(poligono, getLast(poligono));
+                PontoPoligono2 *ppt_first = (PontoPoligono2*)get(poligono, getFirst(poligono));
+                if (tem_interseccao(lx1, ty, lx2, ty, ppt_last->x, ppt_last->y, ppt_first->x, ppt_first->y)) {
+                    return 1;
+                }
             }
             break;
         }
@@ -500,6 +521,14 @@ static void processar_destruicao(Lista formas, Lista poligono_visivel, FILE *txt
     }
 }
 
+
+// Destructor para listas de polígonos (cada elemento é uma Lista de pontos)
+static void destroy_poligono_lista(void *p) {
+    Lista poligono = (Lista)p;
+    if (poligono) {
+        killList(poligono, free); // Libera os pontos com free
+    }
+}
 
 static void acumular_desenho(Lista acumulador, Lista poligono_atual) {
     if (!poligono_atual || length(poligono_atual) < 3) return;
