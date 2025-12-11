@@ -57,8 +57,6 @@ double calcular_angulo(double cy, double cx, double py, double px) {
 
 /**
  * Calcula a distância do raio até um segmento para um ângulo específico.
- * Retorna INFINITY se o raio não cruza o segmento.
- * Baseado no projeto_exemplo: dynamic_distance_to_barrier
  */
 static double distancia_raio_segmento(double ox, double oy, double angulo, void* seg) {
     const double EPSILON = 1e-12;
@@ -261,19 +259,6 @@ Vertice* preparar_vertices_ordenados(double cx, double cy, Lista lista_segs, int
 
     *qtd_out = count;
 
-    // DEBUG: Mostrar eventos criados
-    printf("[DBG] Eventos criados: %d para %d segmentos\n", count, length(lista_segs));
-    for (int i = 0; i < count; i++) {
-        Vertice v = vetor[i];
-        double ang = get_vertice_angulo(v);
-        int tipo = get_vertice_tipo(v);
-        void* seg = get_vertice_segmento(v);
-        int id = get_segmento_id(seg);
-        double ang_deg = ang * 180.0 / M_PI;
-        printf("  [%d] Seg ID=%d, Tipo=%s, Angulo=%.2f rad (%.1f graus)\n", 
-               i, id, (tipo == TIPO_INICIO ? "INICIO" : "FIM"), ang, ang_deg);
-    }
-
     if (tipo_ord == 'm') merge_sort((void**)vetor, count, cutoff, comparar_vertices);
     else quick_sort((void**)vetor, count, comparar_vertices);
 
@@ -361,7 +346,6 @@ int comparar_segmentos_arvore(const void* a, const void* b) {
 
     // 3. Empate (Vértices Compartilhados)
     // Se as distâncias são iguais, usa a orientação do outro extremo para desempatar
-    // (Mesma lógica "Topológica" que passei antes)
     double s1x1 = get_segmento_x1(s1), s1y1 = get_segmento_y1(s1);
     double s1x2 = get_segmento_x2(s1), s1y2 = get_segmento_y2(s1);
     double s2x1 = get_segmento_x1(s2), s2y1 = get_segmento_y1(s2);
@@ -406,7 +390,6 @@ static void set_bbox_limits(double min_x, double min_y, double max_x, double max
 
 /**
  * Lança um raio na direção do ângulo e retorna o ponto de intersecção mais próximo.
- * Baseado no projeto_exemplo: raycast
  */
 static void raycast(double ox, double oy, double angulo, Arvore ativos, Lista anteparos,
                     double *out_x, double *out_y) {
@@ -423,24 +406,14 @@ static void raycast(double ox, double oy, double angulo, Arvore ativos, Lista an
         p = tree_get_next(ativos, p);
     }
     
-    // 2. (Removido) Não verificar todos os anteparos. Confiar na árvore de ativos.
-    // O loop anterior causava erro ao detectar colisão com segmentos que ainda não deveriam estar ativos (no PRE-raycast).
     
-    // 3. Fallback para a bbox
+    // Fallback para a bbox
     double dist_bbox = distancia_raio_bbox(ox, oy, angulo, BBOX_MIN_X, BBOX_MIN_Y, BBOX_MAX_X, BBOX_MAX_Y);
     if (dist_bbox < dist_min) dist_min = dist_bbox;
     
     // Calcula ponto de intersecção
     *out_x = ox + dist_min * cos(angulo);
     *out_y = oy + dist_min * sin(angulo);
-    
-    // DEBUG
-    double ang_deg = angulo * 180.0 / M_PI;
-    int n_ativos = 0;
-    Posic p_dbg = tree_get_first(ativos);
-    while (p_dbg) { n_ativos++; p_dbg = tree_get_next(ativos, p_dbg); }
-    printf("[RAYCAST] ang=%.1f, ativos=%d, dist=%.2f, ponto=(%.2f, %.2f)\n", 
-           ang_deg, n_ativos, dist_min, *out_x, *out_y);
 }
 
 // Estrutura simples para ponto (x,y) - usada no polígono de visibilidade
@@ -490,16 +463,10 @@ static void obter_ponto_interseccao(double bx, double by, Vertice v, void* seg, 
     }
 }
 
-/* ... includes anteriores ... */
-#include "geometria.h" // Necessário para calcular_interseccao
 
-/* ... funções auxiliares (adicionar_aresta, obter_ponto) mantidas ... */
 
 /* =========================================================
- * O ALGORITMO PRINCIPAL (ATUALIZADO)
- * ========================================================= */
-/* =========================================================
- * O ALGORITMO PRINCIPAL (COM GESTÃO DE PAREDES E EIXO ZERO)
+ * ALGORITMO PRINCIPAL DE VISIBILIDADE
  * ========================================================= */
 
 static int vertex_encoberto(double bx, double by, Vertice v, Arvore ativos, void* seg_v) {
@@ -575,7 +542,7 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_m
     // ID temporário seguro
     int id_temp = 99000;
 
-    // Cria os 4 segmentos (sentido min -> max, igual projeto_exemplo)
+    // Cria os 4 segmentos de borda
     Segmento p1 = create_segmento(id_temp++, min_x, min_y, max_x, min_y); // Topo
     Segmento p2 = create_segmento(id_temp++, max_x, min_y, max_x, max_y); // Direita
     Segmento p3 = create_segmento(id_temp++, min_x, max_y, max_x, max_y); // Baixo
@@ -597,8 +564,7 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_m
     Lista poligono_visivel = createList();
     Arvore ativos = tree_create(comparar_segmentos_arvore);
     
-    // 4. PRÉ-CARREGAMENTO DE BARREIRAS NO ÂNGULO 0 (como projeto_exemplo)
-    // Isso garante que barreiras que começam no ângulo 0 estejam ativas no início da varredura
+    // 4. PRÉ-CARREGAMENTO DE BARREIRAS NO ÂNGULO 0
     const double EPSILON_ANGLE = 1e-9;
     for (int i = 0; i < qtd_eventos; i++) {
         Vertice v = eventos[i];
@@ -613,10 +579,9 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_m
     }
 
 
-    // 5. VARREDURA ANGULAR - Padrão pre/post update (baseado no projeto_exemplo)
+    // 5. VARREDURA ANGULAR
     
-    // Adiciona ponto inicial no ângulo 0 SEMPRE
-    // Isso garante o fechamento correto do polígono na borda direita
+    // Adiciona ponto inicial no ângulo 0
     double init_x, init_y;
     raycast(bx, by, 0.0, ativos, anteparos, &init_x, &init_y);
     adicionar_ponto_poligono(poligono_visivel, init_x, init_y);

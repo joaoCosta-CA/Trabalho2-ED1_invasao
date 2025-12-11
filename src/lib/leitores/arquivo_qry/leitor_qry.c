@@ -22,9 +22,9 @@
 // Protótipos das funções auxiliares
 static void tratar_a(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, int *id_seg);
 static Lista obter_poligono_explosao(double x, double y, Lista formas, Lista anteparos, char tipo_ord, int cutoff);
-static void tratar_d(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros, Lista pontos_bombas, char tipo_ord, int cutoff);
-static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros, Lista pontos_bombas, char tipo_ord, int cutoff);
-static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, int *id_global, Lista registros, Lista pontos_bombas, char tipo_ord, int cutoff);
+static void tratar_d(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, const char *nome_base_combo, Lista registros, Lista pontos_bombas, char tipo_ord, int cutoff);
+static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, const char *nome_base_combo, Lista registros, Lista pontos_bombas, char tipo_ord, int cutoff);
+static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, const char *nome_base_combo, int *id_global, Lista registros, Lista pontos_bombas, char tipo_ord, int cutoff);
 static void processar_destruicao(Lista formas, Lista poligono_visivel, FILE *txt);
 static int forma_foi_atingida(Forma f, Lista poligono);
 static void acumular_desenho(Lista acumulador, Lista poligono_atual);
@@ -61,6 +61,12 @@ void processar_qry(const char *path_qry, const char *output_dir, const char *nom
     Lista pontos_bombas = createList();
     int contador_id_segmento = 1; // IDs únicos para novos segmentos
 
+    // Extrai nomes base para geração de SVGs
+    char nome_qry_sem_ext[256];
+    extrair_nome_base(path_qry, nome_qry_sem_ext);
+    char nome_base_combo[512];
+    sprintf(nome_base_combo, "%s-%s", nome_base_geo, nome_qry_sem_ext);
+
     char linha[1024];
     while (fgets(linha, sizeof(linha), qry)) {
         linha[strcspn(linha, "\r\n")] = 0; // Remove newline
@@ -73,27 +79,25 @@ void processar_qry(const char *path_qry, const char *output_dir, const char *nom
             tratar_a(params, lista_formas, lista_anteparos, txt, &contador_id_segmento);
         } 
         else if (strcmp(comando, "d") == 0) {
-            tratar_d(params, lista_formas, lista_anteparos, txt, output_dir, registros_visuais, pontos_bombas, tipo_ord, cutoff);
+            tratar_d(params, lista_formas, lista_anteparos, txt, output_dir, nome_base_combo, registros_visuais, pontos_bombas, tipo_ord, cutoff);
         }
         else if (strcmp(comando, "p") == 0) {
-            tratar_p(params, lista_formas, lista_anteparos, txt, output_dir, registros_visuais, pontos_bombas, tipo_ord, cutoff);
+            tratar_p(params, lista_formas, lista_anteparos, txt, output_dir, nome_base_combo, registros_visuais, pontos_bombas, tipo_ord, cutoff);
         }
         else if (strcmp(comando, "cln") == 0) {
-            tratar_cln(params, lista_formas, lista_anteparos, txt, output_dir, &contador_id_segmento, registros_visuais, pontos_bombas, tipo_ord, cutoff);
+            tratar_cln(params, lista_formas, lista_anteparos, txt, output_dir, nome_base_combo, &contador_id_segmento, registros_visuais, pontos_bombas, tipo_ord, cutoff);
         }
     }
 
     char nome_final_svg[1024];
-    char nome_qry_sem_ext[256];
-    extrair_nome_base(path_qry, nome_qry_sem_ext);
     
     // Nome: nomegeo-nomeqry.svg
-    sprintf(nome_final_svg, "%s/%s-%s.svg", output_dir, nome_base_geo, nome_qry_sem_ext);
+    sprintf(nome_final_svg, "%s/%s.svg", output_dir, nome_base_combo);
     
 
 
     
-    gerar_svg(lista_formas, lista_anteparos, registros_visuais, pontos_bombas, nome_final_svg);
+    gerar_svg_multi(lista_formas, lista_anteparos, registros_visuais, pontos_bombas, nome_final_svg);
 
     // --- LIMPEZA ---
     fclose(qry);
@@ -163,7 +167,7 @@ static void tratar_a(char *params, Lista lista_formas, Lista lista_anteparos, FI
    STUB DO COMANDO 'd'
    ========================================================= */
 static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, 
-                     const char *output_dir, Lista registros_visuais, Lista pontos_bombas, 
+                     const char *output_dir, const char *nome_base_combo, Lista registros_visuais, Lista pontos_bombas, 
                      char tipo_ord, int cutoff) {
     double x, y;
     char sfx[100];
@@ -187,16 +191,15 @@ static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FI
     processar_destruicao(lista_formas, poligono, txt);
     processar_efeito_em_anteparos(lista_anteparos, poligono, txt, 'd', NULL);
 
-    // 4. GERA SVG DE DEBUG
+    // 4. GERA SVG DE DEBUG (formato: nomeGeo-nomeQry-sufixo.svg)
     if (strcmp(sfx, "-") != 0) {
         Lista temp_bomba = createList();
         insert(temp_bomba, pt);
         char nome_arq[1024];
         
-        if (output_dir) sprintf(nome_arq, "%s/bomba_%s.svg", output_dir, sfx);
-        else sprintf(nome_arq, "bomba_%s.svg", sfx);
+        if (output_dir) sprintf(nome_arq, "%s/%s-%s.svg", output_dir, nome_base_combo, sfx);
+        else sprintf(nome_arq, "%s-%s.svg", nome_base_combo, sfx);
         
-        // Corrigido: passa 'lista_formas', 'lista_anteparos' e 'poligono'
         gerar_svg(NULL, NULL, poligono, temp_bomba, nome_arq);
 
         killList(temp_bomba, NULL);
@@ -209,7 +212,7 @@ static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FI
     IMPLEMENTAÇÃO DO COMANDO 'cln'
 ===================================================*/
 
-static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, int *id_global, Lista registros_visuais, Lista pontos_bombas, char tipo_ord, int cutoff) {
+static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, const char *nome_base_combo, int *id_global, Lista registros_visuais, Lista pontos_bombas, char tipo_ord, int cutoff) {
     double x, y, dx, dy;
     char sfx[100];
     
@@ -280,8 +283,8 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
         Lista temp_bomba = createList();
         insert(temp_bomba, pt);
         char path[1024];
-        if (out_dir) sprintf(path, "%s/clonagem_%s.svg", out_dir, sfx);
-        else sprintf(path, "clonagem_%s.svg", sfx);
+        if (out_dir) sprintf(path, "%s/%s-%s.svg", out_dir, nome_base_combo, sfx);
+        else sprintf(path, "%s-%s.svg", nome_base_combo, sfx);
         
         gerar_svg(NULL, NULL, poligono, temp_bomba, path);
     }
@@ -292,7 +295,7 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
 /*=================================================
     IMPLEMENTAÇÃO DO COMANDO 'p'
 ===================================================*/
-static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, Lista registros_visuais, Lista pontos_bombas, char tipo_ord, int cutoff) {
+static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, const char *nome_base_combo, Lista registros_visuais, Lista pontos_bombas, char tipo_ord, int cutoff) {
     double x, y;
     char cor[100], sfx[100];
 
@@ -328,8 +331,8 @@ static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, con
         Lista temp_bomba = createList();
         insert(temp_bomba, pt);
         char path[1024];
-        if (out_dir) sprintf(path, "%s/pintura_%s.svg", out_dir, sfx);
-        else sprintf(path, "pintura_%s.svg", sfx);
+        if (out_dir) sprintf(path, "%s/%s-%s.svg", out_dir, nome_base_combo, sfx);
+        else sprintf(path, "%s-%s.svg", nome_base_combo, sfx);
         
         gerar_svg(NULL, NULL, poligono, temp_bomba, path);
     }
@@ -398,7 +401,7 @@ static int forma_foi_atingida(Forma f, Lista poligono) {
             if (ponto_dentro_poligono(x2, y2, poligono)) return 1;
             if (ponto_dentro_poligono(mx, my, poligono)) return 1;
             
-            // Testa intersecção com arestas do polígono (como projeto_exemplo)
+            // Testa intersecção com arestas do polígono
             Posic p = getFirst(poligono);
             while (p) {
                 void *seg = get(poligono, p);
@@ -415,7 +418,7 @@ static int forma_foi_atingida(Forma f, Lista poligono) {
             break;
         }
         case TEXTO: {
-            // Testa a âncora + converte para linha de colisão (como projeto_exemplo)
+            // Testa a âncora + converte para linha de colisão
             double tx = texto_get_x(dados);
             double ty = texto_get_y(dados);
             if (ponto_dentro_poligono(tx, ty, poligono)) return 1;
@@ -499,10 +502,13 @@ static void processar_destruicao(Lista formas, Lista poligono_visivel, FILE *txt
 
 
 static void acumular_desenho(Lista acumulador, Lista poligono_atual) {
-    if (!poligono_atual) return;
+    if (!poligono_atual || length(poligono_atual) < 3) return;
     
     // Estrutura de ponto usada em visibilidade.c
     typedef struct { double x, y; } PontoPoligono;
+    
+    // Cria uma cópia do polígono para armazenar
+    Lista copia_poligono = createList();
     
     Posic p = getFirst(poligono_atual);
     while(p) {
@@ -512,10 +518,13 @@ static void acumular_desenho(Lista acumulador, Lista poligono_atual) {
         PontoPoligono *copia = malloc(sizeof(PontoPoligono));
         copia->x = pt->x;
         copia->y = pt->y;
-        insert(acumulador, copia);
+        insert(copia_poligono, copia);
         
         p = getNext(poligono_atual, p);
     }
+    
+    // Insere o POLÍGONO INTEIRO como um elemento do acumulador (lista de listas)
+    insert(acumulador, copia_poligono);
 }
 
 static void destroy_segmento_void(void *p) {
@@ -523,24 +532,49 @@ static void destroy_segmento_void(void *p) {
 }
 
 
+// Verifica se um ponto está próximo a algum vértice do polígono (na borda)
+static int ponto_na_borda_poligono(double px, double py, Lista poligono) {
+    typedef struct { double x, y; } PontoPoligono;
+    const double TOL = 1.0; // Tolerância de 1 pixel
+    
+    Posic p = getFirst(poligono);
+    while (p) {
+        PontoPoligono *pt = (PontoPoligono*)get(poligono, p);
+        double dx = px - pt->x;
+        double dy = py - pt->y;
+        if (dx*dx + dy*dy < TOL*TOL) {
+            return 1; // Ponto está na borda
+        }
+        p = getNext(poligono, p);
+    }
+    return 0;
+}
+
 static int anteparo_foi_atingido(Segmento s, Lista poligono) {
     double x1 = get_segmento_x1(s);
     double y1 = get_segmento_y1(s);
     double x2 = get_segmento_x2(s);
     double y2 = get_segmento_y2(s);
     
-    // Um anteparo é atingido se pelo menos uma de suas pontas está DENTRO do polígono.
-    // Anteparos que apenas DEFINEM A BORDA do polígono (bloqueando a visão) não são atingidos.
-    // O ponto_dentro_poligono usa ray-casting que retorna false para pontos na borda.
+    // Verifica se os pontos estão na borda (são vértices do polígono)
+    int p1_na_borda = ponto_na_borda_poligono(x1, y1, poligono);
+    int p2_na_borda = ponto_na_borda_poligono(x2, y2, poligono);
+    
+    // Se QUALQUER ponta está na borda, o anteparo foi TOCADO → ATINGIDO
+    if (p1_na_borda || p2_na_borda) {
+        return 1;
+    }
+    
+    // Verifica se alguma ponta está DENTRO do polígono
     if (ponto_dentro_poligono(x1, y1, poligono) || 
         ponto_dentro_poligono(x2, y2, poligono)) {
         return 1;
     }
     
-    // Também verifica o ponto médio para segmentos que cruzam o polígono
+    // Verifica ponto médio
     double mx = (x1 + x2) / 2.0;
     double my = (y1 + y2) / 2.0;
-    if (ponto_dentro_poligono(mx, my, poligono)) {
+    if (ponto_dentro_poligono(mx, my, poligono) || ponto_na_borda_poligono(mx, my, poligono)) {
         return 1;
     }
     

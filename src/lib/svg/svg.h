@@ -38,4 +38,8 @@
 void gerar_svg(Lista formas, Lista anteparos, Lista poligono, 
                Lista pontos_bombas, const char *caminho_arquivo);
 
+// Versão para múltiplos polígonos (lista de listas de pontos)
+void gerar_svg_multi(Lista formas, Lista anteparos, Lista lista_poligonos, 
+                     Lista pontos_bombas, const char *caminho_arquivo);
+
 #endif
