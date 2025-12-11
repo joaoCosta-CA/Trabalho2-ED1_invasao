@@ -113,7 +113,7 @@ void processar_qry(const char *path_qry, const char *output_dir, const char *nom
 }
 
 /* =========================================================
-   IMPLEMENTAÇÃO DO COMANDO 'a'
+   COMANDO 'a'
    ========================================================= */
 
 static void tratar_a(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, int *id_seg) {
@@ -165,7 +165,7 @@ static void tratar_a(char *params, Lista lista_formas, Lista lista_anteparos, FI
 }
 
 /* =========================================================
-   STUB DO COMANDO 'd'
+   COMANDO 'd'
    ========================================================= */
 static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FILE *txt, 
                      const char *output_dir, const char *nome_base_combo, Lista registros_visuais, Lista pontos_bombas, 
@@ -210,7 +210,7 @@ static void tratar_d(char *params, Lista lista_formas, Lista lista_anteparos, FI
 }
 
 /*=================================================
-    IMPLEMENTAÇÃO DO COMANDO 'cln'
+    COMANDO 'cln'
 ===================================================*/
 
 static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, const char *nome_base_combo, int *id_global, Lista registros_visuais, Lista pontos_bombas, char tipo_ord, int cutoff) {
@@ -295,7 +295,7 @@ static void tratar_cln(char *params, Lista formas, Lista anteparos, FILE *txt, c
 }
 
 /*=================================================
-    IMPLEMENTAÇÃO DO COMANDO 'p'
+    COMANDO 'p'
 ===================================================*/
 static void tratar_p(char *params, Lista formas, Lista anteparos, FILE *txt, const char *out_dir, const char *nome_base_combo, Lista registros_visuais, Lista pontos_bombas, char tipo_ord, int cutoff) {
     double x, y;

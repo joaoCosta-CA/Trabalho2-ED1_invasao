@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include "arvore.h"
 
-// Simple BST Node (no AVL balancing)
+// Nó BST simples
 typedef struct node {
     void* item;
-    double key;          // Numeric key for ordering (used when cmp==NULL)
+    double key;          // Chave numérica para ordenação
     struct node *left;
     struct node *right;
 } Node;
@@ -15,12 +15,12 @@ typedef struct {
     Comparador cmp;
 } TreeStruct;
 
-/* --- BST Helper Functions (simplified) --- */
+/* --- Funções Auxiliares BST --- */
 
 static Node* newNode(void* item) {
     Node* node = (Node*)malloc(sizeof(Node));
     node->item = item;
-    node->key = 0.0;     // Default key (not used if comparator exists)
+    node->key = 0.0;     // Chave padrão
     node->left = NULL;
     node->right = NULL;
     return node;
@@ -37,7 +37,7 @@ static Node* newNodeWithKey(double key, void* item) {
 
 /* --- Funções de Inserção Recursiva --- */
 
-/* Simple BST Insert (no balancing) */
+/* Inserção BST simples */
 static Node* insertNode(Node* node, void* item, Comparador cmp) {
     if (node == NULL)
         return newNode(item);
@@ -48,7 +48,7 @@ static Node* insertNode(Node* node, void* item, Comparador cmp) {
         node->left = insertNode(node->left, item, cmp);
     else if (comparison > 0)
         node->right = insertNode(node->right, item, cmp);
-    // else: duplicate, ignore
+    // Duplicata, ignora
 
     return node;
 }
@@ -69,7 +69,7 @@ static Node* minValueNode(Node* node) {
     return current;
 }
 
-/* Simple BST Delete (no balancing) */
+/* Remoção BST simples */
 static Node* deleteNodeSafe(Node* root, void* item, Comparador cmp, void** item_removido) {
     if (!root) return root;
 
@@ -80,7 +80,7 @@ static Node* deleteNodeSafe(Node* root, void* item, Comparador cmp, void** item_
     } else if (comparison > 0) {
         root->right = deleteNodeSafe(root->right, item, cmp, item_removido);
     } else {
-        // Found node to delete
+        // Nó encontrado para remover
         if (item_removido) *item_removido = root->item;
 
         if (root->left == NULL) {
@@ -93,7 +93,7 @@ static Node* deleteNodeSafe(Node* root, void* item, Comparador cmp, void** item_
             return temp;
         }
 
-        // Two children: get inorder successor
+        // Dois filhos: obtém o sucessor inorder
         Node* temp = minValueNode(root->right);
         root->item = temp->item;
         root->right = deleteNodeSafe(root->right, temp->item, cmp, NULL);
@@ -181,7 +181,7 @@ Posic tree_get_next(Arvore t, Posic pos) {
     TreeStruct *tree = (TreeStruct*)t;
     Node* node = (Node*)pos;
     
-    // If right subtree exists, return leftmost of right
+    // Se existe subárvore direita, retorna o mais à esquerda dela
     if (node->right != NULL) {
         node = node->right;
         while (node->left != NULL)
@@ -189,7 +189,7 @@ Posic tree_get_next(Arvore t, Posic pos) {
         return (Posic)node;
     }
     
-    // Need to go up - use path array (max depth ~100 should be enough)
+    // Precisa subir - usa array de caminho
     Node* path[100];
     int path_len = 0;
     
@@ -197,14 +197,14 @@ Posic tree_get_next(Arvore t, Posic pos) {
         return NULL;
     }
     
-    // Find first ancestor where node is in left subtree
+    // Encontra o primeiro ancestral onde o nó está na subárvore esquerda
     for (int i = path_len - 2; i >= 0; i--) {
         if (path[i]->left == path[i+1]) {
             return (Posic)path[i];
         }
     }
     
-    return NULL; // No successor
+    return NULL; // Sem sucessor
 }
 
 void* tree_get_value(Arvore t, Posic pos) {
@@ -225,10 +225,10 @@ void tree_destroy(Arvore t, void (*freeItem)(void*)) {
 }
 
 /* ========================================================================
- * NUMERIC KEY FUNCTIONS - Match reference implementation
+ * FUNÇÕES COM CHAVE NUMÉRICA
  * ======================================================================== */
 
-// Simple BST insertion (iterative, like reference)
+// Inserção BST simples (iterativa)
 static Node* insertNodeWithKey(Node* root, double key, void* item) {
     Node** current = &root;
     
@@ -258,9 +258,9 @@ static Node* removeNodeWithKey(Node* root, double key, void* data, int* found) {
         root->right = removeNodeWithKey(root->right, key, data, found);
     }
     else {
-        // Key matches - check if data also matches
+        // Chave coincide - verifica se dado também coincide
         if (root->item == data) {
-            // This is the node to delete
+            // Nó a ser removido
             *found = 1;
             
             if ((root->left == NULL) || (root->right == NULL)) {
@@ -280,23 +280,23 @@ static Node* removeNodeWithKey(Node* root, double key, void* data, int* found) {
                 root->right = removeNodeWithKey(root->right, temp->key, temp->item, found);
             }
         } else {
-            // Keys match but data doesn't - continue searching
+            // Chaves iguais mas dados diferentes - continua buscando
             root->right = removeNodeWithKey(root->right, key, data, found);
         }
     }
 
-    // No balancing needed - simple BST
+    // BST simples
     return root;
 }
 
-/* Public API for numeric key insertion */
+/* API pública para inserção com chave numérica */
 void tree_insert_with_key(Arvore *t_ptr, double key, void* item) {
     if (!t_ptr) return;
     TreeStruct *tree = (TreeStruct*) *t_ptr;
     tree->root = insertNodeWithKey(tree->root, key, item);
 }
 
-/* Public API for numeric key removal */
+/* API pública para remoção com chave numérica */
 int tree_remove_with_key(Arvore t, double key, void* data) {
     TreeStruct *tree = (TreeStruct*) t;
     int found = 0;

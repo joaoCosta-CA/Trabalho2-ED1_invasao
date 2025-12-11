@@ -178,8 +178,6 @@ void gerar_svg(Lista formas, Lista anteparos, Lista poligono,
     }
 
     // 4. CAMADA 3: POLÍGONO DE VISIBILIDADE (lista SIMPLES de pontos)
-    // Nota: gerar_svg apenas renderiza lista simples de pontos
-    // Para múltiplos polígonos, use gerar_svg_multi
     if (poligono && length(poligono) >= 3) {
         fprintf(svg, "\t\n");
 

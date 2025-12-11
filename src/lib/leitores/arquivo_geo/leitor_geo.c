@@ -60,10 +60,7 @@ void ler_arquivo_geo(const char *diretorio_base, const char *nome_arquivo, Lista
     fclose(arquivo);
 }
 
-/* * Implementação dos Trata Comandos 
- * Nota: O strtok aqui continua a partir do 'params' passado.
- * Como 'params' é uma string nova (ponteiro), reiniciamos o strtok nela.
- */
+/* Implementação dos Trata Comandos */
 
 static void tratar_circulo(char *params, Lista l, int *max_id) {
     if (!params) return;

@@ -141,10 +141,6 @@ static Vertice criar_vertice_interno(double x, double y, double ang, double dist
     return (Vertice)v;
 }
 
-static int pontos_iguais(double x1, double y1, double x2, double y2) {
-    return dist_sq(x1, y1, x2, y2) < 1e-4;
-}
-
 /* Comparador para o Sort (agora faz cast para VerticeStruct) */
 int comparar_vertices(const void *a, const void *b) {
     VerticeStruct *v1 = *(VerticeStruct**)a;
@@ -325,7 +321,6 @@ int comparar_segmentos_arvore(const void* a, const void* b) {
     if (s1 == s2) return 0;
 
     // 1. Recupera o raio atual da varredura (Bomba -> VerticeAtual)
-    // Nota: Se o vértice atual for o próprio início de s1 ou s2, cuidado com precisão.
     double vx = get_vertice_x(VERTICE_ATUAL);
     double vy = get_vertice_y(VERTICE_ATUAL);
 
@@ -361,23 +356,6 @@ int comparar_segmentos_arvore(const void* a, const void* b) {
     return (get_segmento_id(s1) < get_segmento_id(s2)) ? -1 : 1;
 }
 
-// Limites originais para recorte (sem margem das paredes)
-static double CLIP_MIN_X, CLIP_MIN_Y, CLIP_MAX_X, CLIP_MAX_Y;
-
-static void set_polygon_clip_bounds(double min_x, double min_y, double max_x, double max_y) {
-    CLIP_MIN_X = min_x;
-    CLIP_MIN_Y = min_y;
-    CLIP_MAX_X = max_x;
-    CLIP_MAX_Y = max_y;
-}
-
-static void clamp_point_to_bounds(double *x, double *y) {
-    if (*x < CLIP_MIN_X) *x = CLIP_MIN_X;
-    if (*x > CLIP_MAX_X) *x = CLIP_MAX_X;
-    if (*y < CLIP_MIN_Y) *y = CLIP_MIN_Y;
-    if (*y > CLIP_MAX_Y) *y = CLIP_MAX_Y;
-}
-
 // Variáveis estáticas para bbox (usadas pelo raycast)
 static double BBOX_MIN_X, BBOX_MIN_Y, BBOX_MAX_X, BBOX_MAX_Y;
 
@@ -391,7 +369,7 @@ static void set_bbox_limits(double min_x, double min_y, double max_x, double max
 /**
  * Lança um raio na direção do ângulo e retorna o ponto de intersecção mais próximo.
  */
-static void raycast(double ox, double oy, double angulo, Arvore ativos, Lista anteparos,
+static void raycast(double ox, double oy, double angulo, Arvore ativos,
                     double *out_x, double *out_y) {
     double dist_min = INFINITY;
     
@@ -442,88 +420,9 @@ static void adicionar_ponto_poligono(Lista poligono, double x, double y) {
 }
 
 
-static void obter_ponto_interseccao(double bx, double by, Vertice v, void* seg, double *out_x, double *out_y) {
-    double vx = get_vertice_x(v);
-    double vy = get_vertice_y(v);
-    
-    // Coordenadas do Segmento
-    double sx1 = get_segmento_x1(seg);
-    double sy1 = get_segmento_y1(seg);
-    double sx2 = get_segmento_x2(seg);
-    double sy2 = get_segmento_y2(seg);
-
-    if (!calcular_interseccao_raio_segmento(bx, by, vx, vy, sx1, sy1, sx2, sy2, out_x, out_y)) {
-        double d1 = dist_sq(vx, vy, sx1, sy1);
-        double d2 = dist_sq(vx, vy, sx2, sy2);
-        if (d1 < d2) {
-            *out_x = sx1; *out_y = sy1;
-        } else {
-            *out_x = sx2; *out_y = sy2;
-        }
-    }
-}
-
-
-
 /* =========================================================
  * ALGORITMO PRINCIPAL DE VISIBILIDADE
  * ========================================================= */
-
-static int vertex_encoberto(double bx, double by, Vertice v, Arvore ativos, void* seg_v) {
-    if (!ativos) return 0;
-    
-    double vx = get_vertice_x(v);
-    double vy = get_vertice_y(v);
-    double dist_vertex = dist_sq(bx, by, vx, vy);
-    const double epsilon = 1e-6;
-    
-    Lista temp_list = createList();
-    if (!temp_list) return 0;
-    
-    Posic p = tree_get_first(ativos);
-    int count = 0;
-    const int MAX_COLLECT = 500;
-    
-    while (p && count < MAX_COLLECT) {
-        void* seg = tree_get_value(ativos, p);
-        if (seg) {
-            insert(temp_list, seg);
-            count++;
-        }
-        p = tree_get_next(ativos, p);
-    }
-    
-    int resultado = 0;
-    Posic lista_p = getFirst(temp_list);
-    
-    while (lista_p) {
-        void* seg_ativo = get(temp_list, lista_p);
-        
-        if (seg_ativo != seg_v) {
-            double ix, iy;
-            
-            if (calcular_interseccao_raio_segmento(bx, by, vx, vy,
-                                                    get_segmento_x1(seg_ativo),
-                                                    get_segmento_y1(seg_ativo),
-                                                    get_segmento_x2(seg_ativo),
-                                                    get_segmento_y2(seg_ativo),
-                                                    &ix, &iy)) {
-                double dist_intersection = dist_sq(bx, by, ix, iy);
-                
-                if (dist_intersection < dist_vertex - epsilon) {
-                    resultado = 1;
-                    break;
-                }
-            }
-        }
-        
-        lista_p = getNext(temp_list, lista_p);
-    }
-    
-    killList(temp_list, NULL);
-    
-    return resultado;
-}
 
 
 Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_mundo, char tipo_ord, int cutoff) {
@@ -583,7 +482,7 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_m
     
     // Adiciona ponto inicial no ângulo 0
     double init_x, init_y;
-    raycast(bx, by, 0.0, ativos, anteparos, &init_x, &init_y);
+    raycast(bx, by, 0.0, ativos, &init_x, &init_y);
     adicionar_ponto_poligono(poligono_visivel, init_x, init_y);
 
     for (int idx = 0; idx < qtd_eventos; idx++) {
@@ -598,7 +497,7 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_m
         
         // PRE-UPDATE: Faz raycast ANTES de atualizar a árvore
         double pre_x, pre_y;
-        raycast(bx, by, angulo, ativos, anteparos, &pre_x, &pre_y);
+        raycast(bx, by, angulo, ativos, &pre_x, &pre_y);
         adicionar_ponto_poligono(poligono_visivel, pre_x, pre_y);
         
         // ATUALIZA ÁRVORE
@@ -610,7 +509,7 @@ Lista calcular_visibilidade(double bx, double by, Lista anteparos, Limites box_m
         
         // POST-UPDATE: Faz raycast APÓS atualizar a árvore
         double post_x, post_y;
-        raycast(bx, by, angulo, ativos, anteparos, &post_x, &post_y);
+        raycast(bx, by, angulo, ativos, &post_x, &post_y);
         adicionar_ponto_poligono(poligono_visivel, post_x, post_y);
     }
 
